@@ -1,0 +1,12 @@
+{
+  "name": "gpc-mcp",
+  "description": "gpc-mcp を配るマーケットプレイス",
+  "owner": { "name": "iHideck", "url": "https://github.com/iHideck" },
+  "plugins": [
+    {
+      "name": "gpc-mcp",
+      "source": "./plugin",
+      "description": "Google Play Developer API を呼ぶ MCP サーバー（非公式）。Google Play へのリリース作業を、Claude Code に頼めるようにする"
+    }
+  ]
+}

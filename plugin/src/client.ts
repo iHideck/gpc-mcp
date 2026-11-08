@@ -1,0 +1,125 @@
+import { z } from 'zod';
+
+const REPORTING_ORIGIN = 'https://playdeveloperreporting.googleapis.com';
+const TIMEOUT_MS = 30_000;
+
+export class GpcApiError extends Error {
+  override name = 'GpcApiError';
+  readonly status: number;
+  readonly reasons: readonly string[];
+
+  constructor(status: number, message: string, reasons: readonly string[] = []) {
+    super(message);
+    this.status = status;
+    this.reasons = reasons;
+  }
+}
+
+export type Params = Record<string, string>;
+
+export type GpcClient = {
+  getReporting<T>(path: string, params: Params, schema: z.ZodType<T>): Promise<T>;
+};
+
+const ErrorBody = z.object({
+  error: z.object({
+    code: z.number().optional(),
+    message: z.string().optional(),
+    status: z.string().optional(),
+    // 新しい形（google.rpc.ErrorInfo）の理由は details に、古い形の理由は errors に入る
+    details: z
+      .array(
+        z.object({
+          reason: z.string().optional(),
+          metadata: z.record(z.string(), z.string()).optional(),
+        }),
+      )
+      .optional(),
+    errors: z.array(z.object({ reason: z.string().optional() })).optional(),
+  }),
+});
+
+const HINTS: Partial<Record<number, string>> = {
+  401: 'サービスアカウントの鍵が Google Cloud で有効かを確かめてください。',
+  403: 'サービスアカウントに、この操作の権限がありません。Play Console の「ユーザーと権限」で、サービスアカウントにアプリの権限を与えてください。',
+  429: '呼び出しの上限に達しました。しばらく待ってから、やり直してください。',
+};
+
+export function createClient(
+  token: () => Promise<string>,
+  fetchFn: typeof fetch = fetch,
+): GpcClient {
+  async function call(url: URL): Promise<unknown> {
+    const authorization = `Bearer ${await token()}`;
+    let response: Response;
+    try {
+      response = await fetchFn(url, {
+        method: 'GET',
+        headers: { Authorization: authorization },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (error) {
+      throw new Error(`Google Play の API に接続できませんでした（${reasonOf(error)}）。`, {
+        cause: error,
+      });
+    }
+    const parsed: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      throw apiError(response.status, parsed);
+    }
+    return parsed;
+  }
+
+  return {
+    async getReporting(path, params, schema) {
+      return parse(schema, await call(urlOf(REPORTING_ORIGIN, path, params)), path);
+    },
+  };
+}
+
+function urlOf(origin: string, path: string, params: Params): URL {
+  const url = new URL(path, origin);
+  for (const [name, value] of Object.entries(params)) {
+    url.searchParams.set(name, value);
+  }
+  return url;
+}
+
+function parse<T>(schema: z.ZodType<T>, value: unknown, path: string): T {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new Error(
+      `Google Play の API の ${path} の応答が、思っていた形と違います。\n${z.prettifyError(result.error)}`,
+    );
+  }
+  return result.data;
+}
+
+export function reasonOf(error: unknown, timeoutMs = TIMEOUT_MS): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  if (error.name === 'TimeoutError') {
+    return `${timeoutMs / 1000}秒たっても応答がありません`;
+  }
+  // fetch は、DNS や TLS の失敗を cause に入れ、message は「fetch failed」だけにする
+  return error.cause instanceof Error ? error.cause.message : error.message;
+}
+
+function apiError(status: number, body: unknown): GpcApiError {
+  const error = ErrorBody.safeParse(body).data?.error;
+  const details = error?.details ?? [];
+  const reasons = [...details, ...(error?.errors ?? [])].flatMap(({ reason }) =>
+    reason === undefined ? [] : [reason],
+  );
+  // API を有効にしていないときの 403 は、サービスアカウントの権限とは直し方が違う
+  const disabled = details.find(({ reason }) => reason === 'SERVICE_DISABLED');
+  const hint =
+    disabled === undefined
+      ? HINTS[status]
+      : `Google Cloud のプロジェクトで、この API を有効にしてください。${disabled.metadata?.activationUrl ?? ''}`;
+  const message = [`Google Play の API が ${status} を返しました。`, hint, error?.message]
+    .filter((line) => line !== undefined)
+    .join('\n');
+  return new GpcApiError(status, message, reasons);
+}
