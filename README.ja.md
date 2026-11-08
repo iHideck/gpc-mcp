@@ -36,6 +36,9 @@ MCP サーバーは、PATH にある Node（24 以上）で動く。
 
 | コマンド | すること |
 | :- | :- |
-| `make setup` | 依存を入れる |
+| `make setup` | 依存を入れ、Google の API の仕様を落とす |
 | `make check` | CI と同じ検査（ESLint・整形・型の検査・テスト）を流す |
+| `make download-discovery` | Google がいま配っている API の仕様を、`.local/` に落とし直す |
 | `make validate-plugin` | プラグインとマーケットプレイスの設定を検査する |
+
+テストは、送るリクエストのパス・引数・値が、API の仕様にあるかを確かめる。CI は毎回、Google がいま配っている仕様を落として照らす。
