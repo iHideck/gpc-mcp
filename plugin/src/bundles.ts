@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { basename, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import type { GpcClient } from './client.ts';
 import type { PendingSummary, Play, ReadableEdit } from './edits.ts';
@@ -55,15 +55,14 @@ export async function uploadBundle(
     const versionCode =
       existing?.versionCode ??
       (
-        await client.upload(
-          `${edit.path}/bundles`,
-          { contentType: 'application/octet-stream', bytes },
-          Bundle,
+        await edit.change(`App Bundle ${basename(file)} を上げた`, () =>
+          client.upload(
+            `${edit.path}/bundles`,
+            { contentType: 'application/octet-stream', bytes },
+            Bundle,
+          ),
         )
       ).versionCode;
-    if (existing === undefined) {
-      edit.recordChange(`App Bundle ${versionCode} を上げた`);
-    }
     return {
       packageName,
       versionCode,

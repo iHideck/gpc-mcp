@@ -32,7 +32,7 @@ describe('uploadBundle', () => {
       packageName: PACKAGE,
       versionCode: 12,
       uploaded: true,
-      pending: { expiresAt: expect.any(String), changes: ['App Bundle 12 を上げた'] },
+      pending: { expiresAt: expect.any(String), changes: ['App Bundle app-release.aab を上げた'] },
     });
     expect(fake.live.bundles).toEqual([]);
     const [[id] = []] = fake.openEdits();

@@ -6,25 +6,23 @@ import { listApps } from './apps.ts';
 import { createTokenSource, loadCredentials } from './auth.ts';
 import { uploadBundle } from './bundles.ts';
 import { createClient, isReadOnly } from './client.ts';
-import { createPlay, type Play } from './edits.ts';
+import { createPlay } from './edits.ts';
+import { once } from './lazy.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
 import { selectBuild } from './select-build.ts';
 import { DEFAULT_TRACK } from './tracks.ts';
 
-let play: Play | undefined;
-
 // 鍵は、ツールが初めて呼ばれたときに読む。鍵のファイルを置く前でもサーバーは起動し、ツールが置き場所を返す
-async function getPlay(): Promise<Play> {
-  play ??= createPlay(
+const getPlay = once(async () =>
+  createPlay(
     createClient(
       createTokenSource(await loadCredentials(process.env)),
       fetch,
       isReadOnly(process.env.GPC_READ_ONLY),
     ),
-  );
-  return play;
-}
+  ),
+);
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };

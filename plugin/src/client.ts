@@ -20,6 +20,11 @@ export class GpcApiError extends Error {
   }
 }
 
+// Google に届いたかどうかが分からない失敗（応答が返らない・応答を読めない）
+export class UnknownOutcomeError extends Error {
+  override name = 'UnknownOutcomeError';
+}
+
 export type Params = Record<string, string>;
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -104,7 +109,7 @@ export function createClient(
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
-      throw new Error(
+      throw new UnknownOutcomeError(
         `Google Play の API に接続できませんでした（${reasonOf(error, timeoutMs)}）。${method === 'GET' ? '' : WRITE_UNKNOWN_HINT}`,
         { cause: error },
       );
@@ -131,17 +136,18 @@ export function createClient(
     },
     async post(path, params, body, schema) {
       const url = urlOf(PUBLISHER_ORIGIN, path, params);
-      return parse(schema, await send('POST', url, body && json(body)), path);
+      return parseWritten(schema, await send('POST', url, body && json(body)), path);
     },
     async put(path, body, schema) {
-      return parse(schema, await send('PUT', urlOf(PUBLISHER_ORIGIN, path, {}), json(body)), path);
+      const url = urlOf(PUBLISHER_ORIGIN, path, {});
+      return parseWritten(schema, await send('PUT', url, json(body)), path);
     },
     async remove(path) {
       await send('DELETE', urlOf(PUBLISHER_ORIGIN, path, {}));
     },
     async upload(path, { contentType, bytes }, schema) {
       const url = urlOf(PUBLISHER_ORIGIN, `/upload${path}`, { uploadType: 'media' });
-      return parse(
+      return parseWritten(
         schema,
         await send('POST', url, {
           type: contentType,
@@ -171,6 +177,16 @@ function parse<T>(schema: z.ZodType<T>, value: unknown, path: string): T {
   if (!result.success) {
     throw new Error(
       `Google Play の API の ${path} の応答が、思っていた形と違います。\n${z.prettifyError(result.error)}`,
+    );
+  }
+  return result.data;
+}
+
+function parseWritten<T>(schema: z.ZodType<T>, value: unknown, path: string): T {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new UnknownOutcomeError(
+      `Google Play の API の ${path} の応答が、思っていた形と違います。${WRITE_UNKNOWN_HINT}`,
     );
   }
   return result.data;

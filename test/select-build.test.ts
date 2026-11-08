@@ -77,6 +77,14 @@ describe('selectBuild', () => {
     });
   });
 
+  it('リリースがまだ無いトラックにも、下書きを作る', async () => {
+    const { fake, play } = setup({ alpha: [] });
+
+    await selectBuild(play, { ...request, track: 'alpha' });
+
+    expect(draftIn(fake, 'alpha')).toEqual({ status: 'draft', versionCodes: ['2'] });
+  });
+
   it('リリースの名前を渡すと、その名前にする', async () => {
     const { fake, play } = setup({ production: [] });
 

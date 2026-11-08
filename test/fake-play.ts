@@ -150,9 +150,10 @@ export function fakePlay({
     }
     const trackName = /^\/tracks\/(.+)$/.exec(tail)?.[1];
     if (trackName !== undefined && method === 'GET') {
-      const releases = snapshot.tracks[trackName];
-      return releases === undefined
-        ? apiError(404, `Track ${trackName} not found.`, 'notFound')
+      // リリースが無いトラックは、無いトラックと同じ 404 になる（fastlane と Gradle Play Publisher が前提にしている）
+      const releases = snapshot.tracks[trackName] ?? [];
+      return releases.length === 0
+        ? apiError(404, 'Track not found.', 'notFound')
         : jsonResponse(200, { track: trackName, releases });
     }
     if (trackName !== undefined && method === 'PUT') {

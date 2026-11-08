@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createClient } from '../plugin/src/client.ts';
 import { createPlay } from '../plugin/src/edits.ts';
-import { listTracks, writeTrack } from '../plugin/src/tracks.ts';
+import { listTracks, readTrack, writeTrack } from '../plugin/src/tracks.ts';
 import { apiError, fakePlay, type FakeRelease } from './fake-play.ts';
 
 const PACKAGE = 'com.example.app';
@@ -14,10 +14,9 @@ function setup(options: Parameters<typeof fakePlay>[0] = { tracks: { production:
 }
 
 function addDraft(play: ReturnType<typeof setup>['play'], change = '下書きを足した') {
-  return play.edits.write(PACKAGE, async (edit) => {
-    await writeTrack(play.client, edit, 'production', [COMPLETED, DRAFT]);
-    edit.recordChange(change);
-  });
+  return play.edits.write(PACKAGE, (edit) =>
+    edit.change(change, () => writeTrack(play.client, edit, 'production', [COMPLETED, DRAFT])),
+  );
 }
 
 function statuses(play: ReturnType<typeof setup>['play']) {
@@ -132,6 +131,109 @@ describe('まだ送っていない edit', () => {
     const play = createPlay(createClient(async () => 'TOKEN', fake.fetch));
 
     await expect(statuses(play)).rejects.toThrow(/最初の App Bundle を上げて[\s\S]*not found/);
+  });
+
+  it('届いたのに応答が失われた変更も、届いたか分からない変更として残す', async () => {
+    const { fake, play } = setup();
+    const original = fake.fetch.getMockImplementation() as typeof fetch;
+    fake.fetch.mockImplementation(async (input, init) => {
+      const response = await original(input, init);
+      if (init?.method === 'PUT') {
+        throw new TypeError('fetch failed');
+      }
+      return response;
+    });
+
+    await expect(addDraft(play)).rejects.toThrow('届いたかは分かりません');
+
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual([
+      '下書きを足した（届いたかは分かりません）',
+    ]);
+    expect(fake.openEdits()).toHaveLength(1);
+  });
+
+  it('5xx の変更も、届いたか分からない変更として残す', async () => {
+    const { play } = setup({
+      tracks: { production: [COMPLETED] },
+      failures: {
+        [`PUT /androidpublisher/v3/applications/${PACKAGE}/edits/edit-1/tracks/production`]:
+          apiError(503, 'unavailable'),
+      },
+    });
+
+    await expect(addDraft(play)).rejects.toThrow('503');
+
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual([
+      '下書きを足した（届いたかは分かりません）',
+    ]);
+  });
+
+  it('Google が断った変更は残さず、edit も消す', async () => {
+    const { fake, play } = setup({
+      tracks: { production: [COMPLETED] },
+      failures: {
+        [`PUT /androidpublisher/v3/applications/${PACKAGE}/edits/edit-1/tracks/production`]:
+          apiError(400, 'bad request'),
+      },
+    });
+
+    await expect(addDraft(play)).rejects.toThrow('400');
+
+    expect(play.edits.pending(PACKAGE)).toBeNull();
+    expect(fake.openEdits()).toEqual([]);
+  });
+
+  it('書かない設定で送らなかった変更は、残さない', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const play = createPlay(createClient(async () => 'TOKEN', fake.fetch, true));
+
+    await expect(addDraft(play)).rejects.toThrow('送りませんでした');
+
+    expect(play.edits.pending(PACKAGE)).toBeNull();
+    expect(fake.openEdits()).toEqual([]);
+  });
+
+  it('同じ変更は、一度だけ残す', async () => {
+    const { play } = setup();
+
+    await addDraft(play);
+    await addDraft(play);
+
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual(['下書きを足した']);
+  });
+
+  it('edit が無効になった 404 を、空のトラックと読み違えない', async () => {
+    const { fake, play } = setup({
+      tracks: { production: [COMPLETED] },
+      failures: {
+        [`GET /androidpublisher/v3/applications/${PACKAGE}/edits/edit-1/tracks/production`]:
+          apiError(404, 'Edit not found.', 'editNotFound'),
+      },
+    });
+    await addDraft(play);
+
+    await expect(
+      play.edits.read(PACKAGE, (edit) => readTrack(play.client, edit, 'production')),
+    ).rejects.toThrow('無効になりました');
+
+    expect(play.edits.pending(PACKAGE)).toBeNull();
+    expect(fake.openEdits()).toHaveLength(1);
+  });
+
+  it('別のアプリの呼び出しも順番に行い、作業中の edit を無効にしない', async () => {
+    const { play } = setup();
+
+    const [written] = await Promise.all([
+      play.edits.write(PACKAGE, async (edit) => {
+        await new Promise((resolve) => setImmediate(resolve));
+        return edit.change('下書きを足した', () =>
+          writeTrack(play.client, edit, 'production', [COMPLETED, DRAFT]),
+        );
+      }),
+      play.edits.read('com.example.other', async () => 'read'),
+    ]);
+
+    expect(written).toEqual([COMPLETED, DRAFT]);
   });
 
   it('捨てると、edit を消し、捨てた変更を返す。何も無ければ null を返す', async () => {

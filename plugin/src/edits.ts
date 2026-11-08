@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { appPath, GpcApiError, type GpcClient } from './client.ts';
+import { appPath, GpcApiError, UnknownOutcomeError, type GpcClient } from './client.ts';
 
 export const AppEdit = z.object({ id: z.string(), expiryTimeSeconds: z.string().optional() });
 
@@ -12,7 +12,9 @@ type Pending = PendingSummary & { id: string };
 
 export type ReadableEdit = { path: string };
 
-export type WritableEdit = ReadableEdit & { recordChange(change: string): void };
+export type WritableEdit = ReadableEdit & {
+  change<T>(description: string, work: () => Promise<T>): Promise<T>;
+};
 
 export type Edits = {
   read<T>(packageName: string, work: (edit: ReadableEdit) => Promise<T>): Promise<T>;
@@ -29,15 +31,13 @@ export function createPlay(client: GpcClient): Play {
 
 function createEdits(client: GpcClient): Edits {
   const pendings = new Map<string, Pending>();
-  const queues = new Map<string, Promise<unknown>>();
+  let queue: Promise<unknown> = Promise.resolve();
 
-  // 新しい edit を作ると、開いている edit は無効になる。同じアプリの呼び出しは、順番に行う
-  function inOrder<T>(packageName: string, job: () => Promise<T>): Promise<T> {
-    const run = (queues.get(packageName) ?? Promise.resolve()).then(job);
-    queues.set(
-      packageName,
-      run.catch(() => undefined),
-    );
+  // 新しい edit を作ると、開いている edit は無効になる（Google の文書では、アプリでなく利用者につき1つ）。
+  // Claude は同時に複数のツールを呼ぶので、呼び出しをアプリをまたいで順番に行う
+  function inOrder<T>(job: () => Promise<T>): Promise<T> {
+    const run = queue.then(job);
+    queue = run.catch(() => undefined);
     return run;
   }
 
@@ -99,7 +99,7 @@ function createEdits(client: GpcClient): Edits {
 
   return {
     read(packageName, work) {
-      return inOrder(packageName, async () => {
+      return inOrder(async () => {
         const pending = await currentPending(packageName);
         if (pending !== undefined) {
           return guarded(packageName, pending, () =>
@@ -116,15 +116,30 @@ function createEdits(client: GpcClient): Edits {
     },
 
     write(packageName, work) {
-      return inOrder(packageName, async () => {
+      return inOrder(async () => {
         const pending = (await currentPending(packageName)) ?? (await open(packageName));
         pendings.set(packageName, pending);
         try {
           return await guarded(packageName, pending, () =>
             work({
               path: pathOf(packageName, pending.id),
-              recordChange(change) {
-                pending.changes.push(change);
+              async change(description, step) {
+                const record = (text: string) => {
+                  if (!pending.changes.includes(text)) {
+                    pending.changes.push(text);
+                  }
+                };
+                try {
+                  const result = await step();
+                  record(description);
+                  return result;
+                } catch (error) {
+                  // 記録しないと、捨てる変更の一覧から漏れ、何も変えていない edit として消してしまう
+                  if (mayHaveArrived(error)) {
+                    record(`${description}（届いたかは分かりません）`);
+                  }
+                  throw error;
+                }
               },
             }),
           );
@@ -139,7 +154,7 @@ function createEdits(client: GpcClient): Edits {
     },
 
     discard(packageName) {
-      return inOrder(packageName, async () => {
+      return inOrder(async () => {
         const pending = pendings.get(packageName);
         if (pending === undefined) {
           return null;
@@ -157,7 +172,13 @@ function createEdits(client: GpcClient): Edits {
   };
 }
 
-function isGone(error: unknown): error is GpcApiError {
+function mayHaveArrived(error: unknown): boolean {
+  return (
+    error instanceof UnknownOutcomeError || (error instanceof GpcApiError && error.status >= 500)
+  );
+}
+
+export function isGone(error: unknown): error is GpcApiError {
   return (
     error instanceof GpcApiError && error.reasons.some((reason) => GONE_REASONS.includes(reason))
   );
@@ -166,7 +187,7 @@ function isGone(error: unknown): error is GpcApiError {
 function lostError(pending: Pending, cause: unknown): Error {
   return new Error(
     [
-      'まだ送っていない変更が、Google Play で無効になりました（有効期限が切れた、Play Console で別の変更をした、ほかの場所で edit を作ったかコミットしたなど）。',
+      'まだ送っていない変更が、Google Play で無効になりました（有効期限が切れた、Play Console で別の変更をした、別のアプリを操作した、ほかの場所で edit を作ったかコミットしたなど）。',
       ...(pending.changes.length === 0 ? [] : [`失われた変更: ${pending.changes.join('、')}。`]),
       '必要なら入れ直してください。前の呼び出しで送っている途中だったなら、送り終えているかもしれません。get_release_status で確かめてください。',
     ].join('\n'),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { GpcClient } from './client.ts';
-import type { ReadableEdit, WritableEdit } from './edits.ts';
+import { GpcApiError, type GpcClient } from './client.ts';
+import { isGone, type ReadableEdit, type WritableEdit } from './edits.ts';
 
 export const DEFAULT_TRACK = 'production';
 
@@ -54,8 +54,16 @@ export async function readTrack(
   edit: ReadableEdit,
   name: string,
 ): Promise<Track> {
-  const { track, releases } = await client.get(trackPath(edit, name), {}, TrackResource);
-  return { track, releases: releases ?? [] };
+  try {
+    const { track, releases } = await client.get(trackPath(edit, name), {}, TrackResource);
+    return { track, releases: releases ?? [] };
+  } catch (error) {
+    // リリースがまだ無いトラックは、Google が 404 を返す。無効になった edit の 404 とは分ける
+    if (error instanceof GpcApiError && error.status === 404 && !isGone(error)) {
+      return { track: name, releases: [] };
+    }
+    throw error;
+  }
 }
 
 // Google は、送らなかったリリースをトラックから外す。変えないリリースも送る

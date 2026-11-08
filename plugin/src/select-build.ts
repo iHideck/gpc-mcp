@@ -63,11 +63,14 @@ export async function selectBuild(
       versionCodes: codes,
       ...(name === undefined ? {} : { name }),
     };
-    const stored = await writeTrack(client, edit, track, [
-      ...current.releases.filter((release) => !isDraft(release)),
-      next,
-    ]);
-    edit.recordChange(`${track} の下書きのリリースにビルド ${versionCode} を選んだ`);
+    const stored = await edit.change(
+      `${track} の下書きのリリースにビルド ${versionCode} を選んだ`,
+      () =>
+        writeTrack(client, edit, track, [
+          ...current.releases.filter((release) => !isDraft(release)),
+          next,
+        ]),
+    );
     return result(stored.find(isDraft) ?? next);
   });
 }
