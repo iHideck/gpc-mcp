@@ -15,7 +15,6 @@ const ApkList = z.object({ apks: z.array(Apk).optional() });
 
 export type Build = { versionCode: number; kind: 'bundle' | 'apk'; sha256: string | null };
 
-// 新しいビルド（versionCode の大きいもの）から順に返す
 export async function listBuilds(client: GpcClient, edit: ReadableEdit): Promise<Build[]> {
   const [{ bundles }, { apks }] = await Promise.all([
     client.get(`${edit.path}/bundles`, {}, BundleList),

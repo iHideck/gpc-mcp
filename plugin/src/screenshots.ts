@@ -12,7 +12,6 @@ type ImageRule = {
   label: string;
   maxFiles: number;
   formats: ImageFormat[];
-  // 正確な大きさ（幅x高さ）か、辺の長さの範囲
   size: { exact: string } | { minSide: number; maxSide: number; maxRatio: number };
   maxBytes: number;
   // Play Console ヘルプの規格では、アルファの無い PNG
