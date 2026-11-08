@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
+import { setAppInfo } from './app-info.ts';
 import { listApps } from './apps.ts';
 import { createTokenSource, loadCredentials } from './auth.ts';
 import { uploadBundle } from './bundles.ts';
@@ -11,6 +12,7 @@ import { once } from './lazy.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
 import { selectBuild } from './select-build.ts';
+import { localizationInput, setLocalizations } from './set-localizations.ts';
 import { DEFAULT_TRACK } from './tracks.ts';
 
 // 鍵は、ツールが初めて呼ばれたときに読む。鍵のファイルを置く前でもサーバーは起動し、ツールが置き場所を返す
@@ -128,6 +130,61 @@ server.registerTool(
     },
   },
   async (request) => json(await selectBuild(await getPlay(), request)),
+);
+
+server.registerTool(
+  'set_localizations',
+  {
+    title: '掲載の文を入れる',
+    description:
+      'ストアの掲載情報（タイトル・簡単な説明・詳しい説明・動画の URL）と、トラックの下書きのリリースのリリースノートを、言語ごとに入れる。渡した項目だけを変える。入れる前に上限の文字数と URL の形を確かめ、1つでも合わなければ何も変えない。掲載情報が無い言語は、タイトル・簡単な説明・詳しい説明を全部渡すと新しく作る。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。変えた項目の前と後と、気を付けること（warnings）を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      track: trackArgument,
+      localizations: z
+        .array(localizationInput)
+        .min(1)
+        .describe('言語ごとの文。渡さない項目は変えない'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await setLocalizations(await getPlay(), request)),
+);
+
+server.registerTool(
+  'set_app_info',
+  {
+    title: 'App の情報を入れる',
+    description:
+      'ストアに出す連絡先（メール・電話・ウェブサイト）と、既定の言語を入れる。渡した項目だけを変える。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。カテゴリ・コンテンツのレーティング・データセーフティは API に無いので、Play Console で入れる。変える前と後を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      defaultLanguage: z.string().min(1).optional().describe('既定の言語（例: ja-JP）'),
+      contactEmail: z.email().optional().describe('ストアに出すメールアドレス'),
+      contactPhone: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('ストアに出す電話番号。null か空の文字にすると消す。省くと変えない'),
+      contactWebsite: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('ストアに出すウェブサイト。null か空の文字にすると消す。省くと変えない'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await setAppInfo(await getPlay(), request)),
 );
 
 server.registerTool(
