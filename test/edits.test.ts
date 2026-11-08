@@ -1,0 +1,133 @@
+import { describe, expect, it } from 'vitest';
+import { createClient } from '../plugin/src/client.ts';
+import { createPlay } from '../plugin/src/edits.ts';
+import { listTracks, writeTrack } from '../plugin/src/tracks.ts';
+import { fakePlay, type FakeRelease } from './fake-play.ts';
+
+const PACKAGE = 'com.example.app';
+const COMPLETED: FakeRelease = { name: '1.0.0', status: 'completed', versionCodes: ['1'] };
+const DRAFT: FakeRelease = { status: 'draft', versionCodes: ['2'] };
+
+function setup(options: Parameters<typeof fakePlay>[0] = { tracks: { production: [COMPLETED] } }) {
+  const fake = fakePlay(options);
+  return { fake, play: createPlay(createClient(async () => 'TOKEN', fake.fetch)) };
+}
+
+function addDraft(play: ReturnType<typeof setup>['play'], change = '下書きを足した') {
+  return play.edits.write(PACKAGE, async (edit) => {
+    await writeTrack(play.client, edit, 'production', [COMPLETED, DRAFT]);
+    edit.recordChange(change);
+  });
+}
+
+function statuses(play: ReturnType<typeof setup>['play']) {
+  return play.edits.read(PACKAGE, async (edit) =>
+    (await listTracks(play.client, edit)).flatMap(({ releases }) =>
+      releases.map(({ status }) => status),
+    ),
+  );
+}
+
+describe('まだ送っていない edit', () => {
+  it('変えた edit は残り、Google Play の公開中の状態は変わらない', async () => {
+    const { fake, play } = setup();
+
+    await addDraft(play);
+
+    expect(fake.openEdits()).toHaveLength(1);
+    expect(fake.live.tracks.production).toEqual([COMPLETED]);
+    expect(play.edits.pending(PACKAGE)).toEqual({
+      expiresAt: '2027-01-15T08:00:00.000Z',
+      changes: ['下書きを足した'],
+    });
+  });
+
+  it('読むときは、新しい edit を作らず、まだ送っていない edit を読む', async () => {
+    const { fake, play } = setup();
+    await addDraft(play);
+
+    expect(await statuses(play)).toEqual(['completed', 'draft']);
+
+    expect(fake.openEdits()).toHaveLength(1);
+    expect(fake.requests().filter((request) => request.endsWith('/edits'))).toHaveLength(1);
+  });
+
+  it('書くツールは、同じ edit に積み重ねる', async () => {
+    const { fake, play } = setup();
+
+    await addDraft(play, '1つ目');
+    await addDraft(play, '2つ目');
+
+    expect(fake.requests().filter((request) => request.endsWith('/edits'))).toHaveLength(1);
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual(['1つ目', '2つ目']);
+  });
+
+  it('同時に書いても、1つの edit に順に入る', async () => {
+    const { fake, play } = setup();
+
+    await Promise.all([addDraft(play, '1つ目'), addDraft(play, '2つ目')]);
+
+    expect(fake.requests().filter((request) => request.endsWith('/edits'))).toHaveLength(1);
+    expect(fake.openEdits()).toHaveLength(1);
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual(['1つ目', '2つ目']);
+  });
+
+  it('何も変えなかったら、edit を残さない', async () => {
+    const { fake, play } = setup();
+
+    await play.edits.write(PACKAGE, async () => undefined);
+
+    expect(fake.openEdits()).toEqual([]);
+    expect(play.edits.pending(PACKAGE)).toBeNull();
+  });
+
+  it('途中で失敗しても、前に変えたものは残る', async () => {
+    const { fake, play } = setup();
+    await addDraft(play);
+
+    await expect(
+      play.edits.write(PACKAGE, async () => {
+        throw new Error('途中で失敗');
+      }),
+    ).rejects.toThrow('途中で失敗');
+
+    expect(fake.openEdits()).toHaveLength(1);
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual(['下書きを足した']);
+  });
+
+  it('Play Console で変えて無効になったら、失われた変更を知らせ、次の呼び出しは新しい edit で動く', async () => {
+    const { fake, play } = setup();
+    await addDraft(play);
+    fake.changeInConsole();
+
+    await expect(statuses(play)).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
+
+    expect(play.edits.pending(PACKAGE)).toBeNull();
+    expect(await statuses(play)).toEqual(['completed']);
+  });
+
+  it('書いている途中で無効になっても、失われた変更を知らせて手放す', async () => {
+    const { fake, play } = setup();
+    await addDraft(play);
+
+    await expect(
+      play.edits.write(PACKAGE, async (edit) => {
+        fake.changeInConsole();
+        await writeTrack(play.client, edit, 'production', [COMPLETED]);
+      }),
+    ).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
+
+    expect(play.edits.pending(PACKAGE)).toBeNull();
+  });
+
+  it('捨てると、edit を消し、捨てた変更を返す。何も無ければ null を返す', async () => {
+    const { fake, play } = setup();
+    await addDraft(play);
+
+    expect(await play.edits.discard(PACKAGE)).toMatchObject({ changes: ['下書きを足した'] });
+
+    expect(fake.openEdits()).toEqual([]);
+    expect(fake.live.tracks.production).toEqual([COMPLETED]);
+    expect(await play.edits.discard(PACKAGE)).toBeNull();
+  });
+});

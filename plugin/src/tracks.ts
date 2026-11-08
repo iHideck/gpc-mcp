@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { GpcClient } from './client.ts';
-import type { ReadableEdit } from './edits.ts';
+import type { ReadableEdit, WritableEdit } from './edits.ts';
 
 export const DEFAULT_TRACK = 'production';
 
@@ -56,6 +56,17 @@ export async function readTrack(
 ): Promise<Track> {
   const { track, releases } = await client.get(trackPath(edit, name), {}, TrackResource);
   return { track, releases: releases ?? [] };
+}
+
+// Google は、送らなかったリリースをトラックから外す。変えないリリースも送る
+export async function writeTrack(
+  client: GpcClient,
+  edit: WritableEdit,
+  name: string,
+  releases: Release[],
+): Promise<Release[]> {
+  const updated = await client.put(trackPath(edit, name), { track: name, releases }, TrackResource);
+  return updated.releases ?? [];
 }
 
 function trackPath(edit: ReadableEdit, name: string): string {

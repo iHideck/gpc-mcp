@@ -74,6 +74,25 @@ describe('MCP サーバー', () => {
           }),
         }),
       }),
+      expect.objectContaining({
+        name: 'upload_bundle',
+        annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
+        inputSchema: expect.objectContaining({ required: ['packageName', 'file'] }),
+      }),
+      expect.objectContaining({
+        name: 'select_build',
+        annotations: expect.objectContaining({
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+        }),
+        inputSchema: expect.objectContaining({ required: ['packageName', 'versionCode'] }),
+      }),
+      expect.objectContaining({
+        name: 'discard_changes',
+        annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
+        inputSchema: expect.objectContaining({ required: ['packageName'] }),
+      }),
     ]);
 
     const called = await server.request('tools/call', { name: 'list_apps', arguments: {} });

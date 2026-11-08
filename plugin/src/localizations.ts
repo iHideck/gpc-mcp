@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { GpcClient } from './client.ts';
-import type { Play, ReadableEdit } from './edits.ts';
+import type { PendingSummary, Play, ReadableEdit } from './edits.ts';
 import { isDraft, readTrack, viewOf, type Release, type ReleaseView } from './tracks.ts';
 
 export const Listing = z.looseObject({
@@ -43,6 +43,7 @@ export type Localizations = {
     release: ReleaseView;
     notes: { locale: string; text: string }[];
   } | null;
+  pending: PendingSummary | null;
 };
 
 export async function listListings(client: GpcClient, edit: ReadableEdit): Promise<Listing[]> {
@@ -88,6 +89,7 @@ export async function getLocalizations(
                 .filter(({ language }) => wanted(language))
                 .map(({ language, text }) => ({ locale: language, text })),
             },
+      pending: edits.pending(packageName),
     };
   });
 }

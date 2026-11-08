@@ -72,6 +72,7 @@ describe('getLocalizations', () => {
           { locale: 'en-US', text: '次の版 (en)' },
         ],
       },
+      pending: null,
     });
   });
 

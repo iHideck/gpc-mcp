@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { vi } from 'vitest';
 import { assertInSpec, jsonResponse, request } from './fake-api.ts';
 
@@ -29,6 +30,7 @@ type Snapshot = {
 type Options = Partial<Snapshot> & {
   lifecycle?: Record<string, unknown[]>;
   failures?: Record<string, Response>;
+  nextVersionCode?: number;
 };
 
 type Edit = { snapshot: Snapshot; invalidBecause?: string };
@@ -49,7 +51,12 @@ export function apiError(status: number, message: string, reason?: string): Resp
 }
 
 // Google の文書どおりに edit を扱う偽の Google Play。送ったリクエストは、毎回、API の仕様と照らす
-export function fakePlay({ lifecycle = {}, failures = {}, ...initial }: Options = {}) {
+export function fakePlay({
+  lifecycle = {},
+  failures = {},
+  nextVersionCode = 100,
+  ...initial
+}: Options = {}) {
   const live: Snapshot = {
     details: {},
     listings: [],
@@ -79,8 +86,8 @@ export function fakePlay({ lifecycle = {}, failures = {}, ...initial }: Options 
     return edit;
   }
 
-  function handle(method: string, url: URL): Response {
-    const path = decodeURIComponent(url.pathname);
+  function handle(method: string, url: URL, init: RequestInit | undefined): Response {
+    const path = decodeURIComponent(url.pathname).replace(/^\/upload/, '');
     const app = /^\/androidpublisher\/v3\/applications\/[^/]+/.exec(path)?.[0];
     if (app === undefined) {
       throw new Error(`偽の Google Play が受け付けないパスです: ${path}`);
@@ -131,12 +138,31 @@ export function fakePlay({ lifecycle = {}, failures = {}, ...initial }: Options 
         tracks: Object.entries(snapshot.tracks).map(([track, releases]) => ({ track, releases })),
       });
     }
+    if (route === 'POST /bundles') {
+      const bytes = init?.body as Uint8Array<ArrayBuffer>;
+      const bundle = {
+        versionCode: nextVersionCode++,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        sha1: createHash('sha1').update(bytes).digest('hex'),
+      };
+      snapshot.bundles.push(bundle);
+      return jsonResponse(200, bundle);
+    }
     const trackName = /^\/tracks\/(.+)$/.exec(tail)?.[1];
     if (trackName !== undefined && method === 'GET') {
       const releases = snapshot.tracks[trackName];
       return releases === undefined
         ? apiError(404, `Track ${trackName} not found.`, 'notFound')
         : jsonResponse(200, { track: trackName, releases });
+    }
+    if (trackName !== undefined && method === 'PUT') {
+      const { releases } = JSON.parse(String(init?.body)) as { releases: FakeRelease[] };
+      const statuses = releases.map(({ status }) => status);
+      if (new Set(statuses).size !== statuses.length) {
+        return apiError(400, 'Releases must have distinct statuses.');
+      }
+      snapshot.tracks[trackName] = releases;
+      return jsonResponse(200, { track: trackName, releases });
     }
     throw new Error(`偽の Google Play が受け付けないリクエストです: ${method} ${path}`);
   }
@@ -153,13 +179,14 @@ export function fakePlay({ lifecycle = {}, failures = {}, ...initial }: Options 
       failing.delete(key);
       return failure;
     }
-    return handle(method, url);
+    return handle(method, url, init);
   });
 
   return {
     fetch: fetchFn,
     live,
     openEdits: () => [...edits.entries()].filter(([, edit]) => edit.invalidBecause === undefined),
+    snapshotOf: (id: string) => edits.get(id)?.snapshot,
     changeInConsole: () => invalidateAll('editDeleted'),
     requests: () =>
       fetchFn.mock.calls.map(([input, init]) => {
