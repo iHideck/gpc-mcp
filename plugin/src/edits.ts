@@ -9,7 +9,6 @@ import {
 
 export const AppEdit = z.object({ id: z.string(), expiryTimeSeconds: z.string().optional() });
 
-// edit が無効になったとき、Google が返す理由
 const GONE_REASONS = ['editExpired', 'editNotFound', 'editAlreadyCommitted', 'editDeleted'];
 
 export type PendingSummary = { expiresAt: string | null; changes: string[] };
