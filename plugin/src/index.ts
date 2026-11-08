@@ -4,25 +4,25 @@ import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
 import { listApps } from './apps.ts';
 import { createTokenSource, loadCredentials } from './auth.ts';
+import { uploadBundle } from './bundles.ts';
 import { createClient, isReadOnly } from './client.ts';
-import { createPlay, type Play } from './edits.ts';
+import { createPlay } from './edits.ts';
+import { once } from './lazy.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
+import { selectBuild } from './select-build.ts';
 import { DEFAULT_TRACK } from './tracks.ts';
 
-let play: Play | undefined;
-
 // 鍵は、ツールが初めて呼ばれたときに読む。鍵のファイルを置く前でもサーバーは起動し、ツールが置き場所を返す
-async function getPlay(): Promise<Play> {
-  play ??= createPlay(
+const getPlay = once(async () =>
+  createPlay(
     createClient(
       createTokenSource(await loadCredentials(process.env)),
       fetch,
       isReadOnly(process.env.GPC_READ_ONLY),
     ),
-  );
-  return play;
-}
+  ),
+);
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
@@ -57,7 +57,7 @@ server.registerTool(
   {
     title: 'リリースの状態',
     description:
-      '新しい順に5つのビルドと、リリースのあるトラックごとのリリース（名前・状態・ビルド・段階的公開の割合）と審査の状態（review。読めなければ null）を返す。',
+      '新しい順に5つのビルドと、リリースのあるトラックごとのリリース（名前・状態・ビルド・段階的公開の割合）と審査の状態（review。読めなければ null）を返す。まだ送っていない変更（pending）があれば、それも入った状態を返す。',
     inputSchema: z.object(appArguments),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -82,6 +82,70 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   async (request) => json(await getLocalizations(await getPlay(), request)),
+);
+
+server.registerTool(
+  'upload_bundle',
+  {
+    title: 'App Bundle を上げる',
+    description:
+      'App Bundle（.aab）を、まだ送っていない変更に上げる。同じファイル（SHA-256 が同じもの）がもうあれば、上げ直さない。アプリの最初のビルドは、API では上げられないので Play Console で上げる。上げたビルドの versionCode と、まだ送っていない変更（pending）を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      file: z.string().min(1).describe('App Bundle のファイルの絶対パス'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await uploadBundle(await getPlay(), request)),
+);
+
+server.registerTool(
+  'select_build',
+  {
+    title: 'ビルドを選ぶ',
+    description:
+      'トラックの下書きのリリースに、ビルドを選ぶ。下書きが無ければ作る。リリースの名前は、省くと Google がビルドの版から付ける。公開中のリリースは変えない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。選ぶ前と後の下書きと、まだ送っていない変更（pending）を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      track: trackArgument,
+      versionCode: z.number().int().positive().describe('ビルドの versionCode（例: 12）'),
+      releaseName: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('リリースの名前（例: 1.0.2）。省くと、下書きの名前を Google に任せる'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await selectBuild(await getPlay(), request)),
+);
+
+server.registerTool(
+  'discard_changes',
+  {
+    title: 'まだ送っていない変更を捨てる',
+    description:
+      'まだ Google Play に送っていない変更（pending）を、すべて捨てる。上げた App Bundle も捨てられる。捨てた変更を返す。何も無ければ null を返す。',
+    inputSchema: z.object(appArguments),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async ({ packageName }) =>
+    json({ packageName, discarded: await (await getPlay()).edits.discard(packageName) }),
 );
 
 await server.connect(new StdioServerTransport());

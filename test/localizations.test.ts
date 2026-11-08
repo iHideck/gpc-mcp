@@ -72,6 +72,7 @@ describe('getLocalizations', () => {
           { locale: 'en-US', text: '次の版 (en)' },
         ],
       },
+      pending: null,
     });
   });
 
@@ -129,11 +130,14 @@ describe('getLocalizations', () => {
     ).rejects.toThrow('言語 ja の文はありません。ある言語は ja-JP、en-US です。');
   });
 
-  it('無いトラックを渡すと、Google のエラーを返す', async () => {
+  it('無いトラックを渡すと、リリースノートは null', async () => {
     const play = setup({ listings });
 
-    await expect(
-      getLocalizations(play, { packageName: PACKAGE, track: 'closed-1' }),
-    ).rejects.toThrow('Track closed-1 not found');
+    const { releaseNotes } = await getLocalizations(play, {
+      packageName: PACKAGE,
+      track: 'closed-1',
+    });
+
+    expect(releaseNotes).toBeNull();
   });
 });

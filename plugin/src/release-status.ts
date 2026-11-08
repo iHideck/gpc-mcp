@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { listBuilds, type Build } from './bundles.ts';
 import { appPath, GpcApiError, type GpcClient } from './client.ts';
-import type { Play } from './edits.ts';
+import type { PendingSummary, Play } from './edits.ts';
 import { listTracks, viewOf, type ReleaseView } from './tracks.ts';
 
 const LATEST_BUILDS = 5;
@@ -22,6 +22,7 @@ export type ReleaseStatus = {
   packageName: string;
   builds: Build[];
   tracks: TrackStatus[];
+  pending: PendingSummary | null;
   warnings: string[];
 };
 
@@ -46,6 +47,7 @@ export async function getReleaseStatus(
         releases: releases.map(viewOf),
         review: reviews[index]?.review ?? null,
       })),
+      pending: edits.pending(packageName),
       warnings: reviews.flatMap(({ warning }) => (warning === undefined ? [] : [warning])),
     };
   });

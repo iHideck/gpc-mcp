@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { GpcClient } from './client.ts';
-import type { ReadableEdit } from './edits.ts';
+import { GpcApiError, type GpcClient } from './client.ts';
+import { isGone, type ReadableEdit, type WritableEdit } from './edits.ts';
 
 export const DEFAULT_TRACK = 'production';
 
@@ -9,7 +9,7 @@ const LocalizedText = z.object({ language: z.string(), text: z.string() });
 // 読んだリリースは、そのまま Google に送り返す。ツールが知らない項目（国の指定など）も落とさない
 export const Release = z.looseObject({
   name: z.string().optional(),
-  status: z.string(),
+  status: z.string().default('statusUnspecified'),
   versionCodes: z.array(z.string()).optional(),
   userFraction: z.number().optional(),
   releaseNotes: z.array(LocalizedText).optional(),
@@ -54,8 +54,27 @@ export async function readTrack(
   edit: ReadableEdit,
   name: string,
 ): Promise<Track> {
-  const { track, releases } = await client.get(trackPath(edit, name), {}, TrackResource);
-  return { track, releases: releases ?? [] };
+  try {
+    const { track, releases } = await client.get(trackPath(edit, name), {}, TrackResource);
+    return { track, releases: releases ?? [] };
+  } catch (error) {
+    // リリースがまだ無いトラックは、Google が 404 を返す。無効になった edit の 404 とは分ける
+    if (error instanceof GpcApiError && error.status === 404 && !isGone(error)) {
+      return { track: name, releases: [] };
+    }
+    throw error;
+  }
+}
+
+// Google は、送らなかったリリースをトラックから外す。変えないリリースも送る
+export async function writeTrack(
+  client: GpcClient,
+  edit: WritableEdit,
+  name: string,
+  releases: Release[],
+): Promise<Release[]> {
+  const updated = await client.put(trackPath(edit, name), { track: name, releases }, TrackResource);
+  return updated.releases ?? [];
 }
 
 function trackPath(edit: ReadableEdit, name: string): string {

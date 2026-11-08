@@ -76,6 +76,7 @@ describe('getReleaseStatus', () => {
           review: [{ releaseName: '1.2.0', state: 'IN_REVIEW', versionCodes: [6] }],
         },
       ],
+      pending: null,
       warnings: [],
     });
   });

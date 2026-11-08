@@ -11,6 +11,9 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `list_apps` | アプリの名前とパッケージ名を返す |
 | `get_release_status` | 新しい5つのビルドと、トラックごとのリリースと、リリースごとの審査の状態を返す |
 | `get_localizations` | 言語ごとのストアの掲載情報（タイトル・簡単な説明・詳しい説明・動画の URL）と、既定の言語と、トラックのリリースノートを返す |
+| `upload_bundle` | App Bundle を、まだ送っていない変更に上げる。同じファイルがあれば上げ直さない |
+| `select_build` | トラックの下書きのリリースに、ビルドを選ぶ。下書きが無ければ作る |
+| `discard_changes` | まだ Google Play に送っていない変更を捨てる |
 
 ## 入れ方
 
