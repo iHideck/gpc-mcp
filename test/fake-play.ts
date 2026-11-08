@@ -138,6 +138,19 @@ export function fakePlay({
         tracks: Object.entries(snapshot.tracks).map(([track, releases]) => ({ track, releases })),
       });
     }
+    if (route === 'PUT /details') {
+      snapshot.details = JSON.parse(String(init?.body)) as Snapshot['details'];
+      return jsonResponse(200, snapshot.details);
+    }
+    const listingLanguage = /^\/listings\/([^/]+)$/.exec(tail)?.[1];
+    if (listingLanguage !== undefined && method === 'PUT') {
+      const listing = JSON.parse(String(init?.body)) as FakeListing;
+      snapshot.listings = [
+        ...snapshot.listings.filter(({ language }) => language !== listingLanguage),
+        listing,
+      ];
+      return jsonResponse(200, listing);
+    }
     if (route === 'POST /bundles') {
       const bytes = init?.body as Uint8Array<ArrayBuffer>;
       const bundle = {

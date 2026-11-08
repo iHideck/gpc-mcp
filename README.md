@@ -13,6 +13,8 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `get_localizations` | Returns the store listing text for each language (title, short description, full description, and video URL), the default language, and the release notes of a track. |
 | `upload_bundle` | Uploads an Android App Bundle to the unsent changes. Does not upload a file that Google Play already has. |
 | `select_build` | Selects a build for the draft release of a track. Creates the draft release if the track has none. |
+| `set_localizations` | Writes the store listing text and the release notes of the draft release for each language. Checks the character limits and URL formats before it writes. Creates a listing for a new language when you pass all required text. |
+| `set_app_info` | Sets the contact email, phone, and website, and the default language. |
 | `discard_changes` | Discards all changes that you have not sent to Google Play. |
 
 ## Install
