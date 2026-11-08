@@ -36,6 +36,9 @@ The plugin is in `plugin/`. With the plugin, Claude Code installs only the depen
 
 | Command | What it does |
 | :- | :- |
-| `make setup` | Installs the dependencies. |
+| `make setup` | Installs the dependencies and downloads the API specifications from Google. |
 | `make check` | Runs the same checks as CI (ESLint, formatting, type checks, and tests). |
+| `make download-discovery` | Downloads the current API specifications from Google to `.local/` again. |
 | `make validate-plugin` | Validates the plugin and marketplace configuration. |
+
+The tests check that the path, parameters, and values of each request exist in the API specifications. Each CI run downloads the current specifications from Google and checks against them.
