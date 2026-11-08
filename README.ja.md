@@ -21,6 +21,14 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `set_phased_release` | 段階的公開を、止める・再開する・割合を変える・全員に出す。全員に出すのは取り消せない。呼ぶたびに、利用者の確認が要る |
 | `discard_changes` | まだ Google Play に送っていない変更を捨てる |
 
+準備のツールは、「まだ送っていない変更」に入れるだけで、`submit_for_review` か `save_draft` を呼ぶまで、Google Play には何も届かない。まだ送っていない変更は、有効期限が切れるか、Play Console でアプリを変えるか、Claude Code を起動し直すと失われる。Google の文書では開ける edit が利用者につき1つなので、別のアプリを操作しても失われることがある。失われたら、ツールが知らせる。
+
+カテゴリ・価格・配信する国・アプリのコンテンツの申告、管理対象の公開で止めた変更の公開、審査の取り下げは、Google Play の API に無い。Play Console で行う。
+
+## スキル
+
+`/gpc-mcp:release` は、次の版の準備から、審査に出して段階的に公開するまでを、上のツールでつなぐ。「Android の次の版を出したい」「審査に出して」と頼むと、Claude が読み込む。
+
 ## 入れ方
 
 MCP サーバーは、PATH にある Node（24 以上）で動く。
