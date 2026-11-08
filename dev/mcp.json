@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gpc": {
+      "command": "node",
+      "args": ["plugin/src/index.ts"],
+      "env": {
+        "GPC_SERVICE_ACCOUNT_KEY": "${GPC_SERVICE_ACCOUNT_KEY}",
+        "GPC_READ_ONLY": "${GPC_READ_ONLY:-1}"
+      }
+    }
+  }
+}

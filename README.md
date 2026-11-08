@@ -42,5 +42,8 @@ The plugin is in `plugin/`. With the plugin, Claude Code installs only the depen
 | `make check` | Runs the same checks as CI (ESLint, formatting, type checks, and tests). |
 | `make download-discovery` | Downloads the current API specifications from Google to `.local/` again. |
 | `make validate-plugin` | Validates the plugin and marketplace configuration. |
+| `make run-claude` | Starts Claude Code connected to the MCP server from your local source. |
 
 The tests check that the path, parameters, and values of each request exist in the API specifications. Each CI run downloads the current specifications from Google and checks against them.
+
+To test your local source against the real API, put the path of the JSON key in the `GPC_SERVICE_ACCOUNT_KEY` environment variable, then run `make run-claude`. The plugin configuration does not reach a plugin that `claude --plugin-dir` loads. In this setup, tools that write do not change Google Play. Instead, they return the request they would have sent as an error. To write to Google Play, also set `GPC_READ_ONLY=0`.

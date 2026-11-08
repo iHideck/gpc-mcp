@@ -3,6 +3,8 @@ import { z } from 'zod';
 const PUBLISHER_ORIGIN = 'https://androidpublisher.googleapis.com';
 const REPORTING_ORIGIN = 'https://playdeveloperreporting.googleapis.com';
 const TIMEOUT_MS = 30_000;
+// edit を作る・消すだけでは、アプリは変わらない。読むツールは edit の中で読むので、書かない設定でも通す
+const EDIT_HOUSEKEEPING = /^\/androidpublisher\/v3\/applications\/[^/]+\/edits(\/[^/:]+)?$/;
 
 export class GpcApiError extends Error {
   override name = 'GpcApiError';
@@ -55,11 +57,22 @@ const HINTS: Partial<Record<number, string>> = {
   429: '呼び出しの上限に達しました。しばらく待ってから、やり直してください。',
 };
 
+// 書かない設定は、値が無いか 0 のときだけ外す。打ち間違い（true など）で、本番に書いてしまわないため
+export function isReadOnly(value: string | undefined): boolean {
+  return value !== undefined && value !== '' && value !== '0';
+}
+
 export function createClient(
   token: () => Promise<string>,
   fetchFn: typeof fetch = fetch,
+  readOnly = false,
 ): GpcClient {
   async function call(method: Method, url: URL, body?: object): Promise<unknown> {
+    if (readOnly && method !== 'GET' && !EDIT_HOUSEKEEPING.test(url.pathname)) {
+      throw new Error(
+        `書かない設定で動いているので、次のリクエストを送りませんでした: ${method} ${url.pathname}${url.search}${body === undefined ? '' : ` ${JSON.stringify(body)}`}`,
+      );
+    }
     const authorization = `Bearer ${await token()}`;
     let response: Response;
     try {
