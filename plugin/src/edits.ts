@@ -124,19 +124,17 @@ function createEdits(client: GpcClient): Edits {
             work({
               path: pathOf(packageName, pending.id),
               async change(description, step) {
-                const record = (text: string) => {
-                  if (!pending.changes.includes(text)) {
-                    pending.changes.push(text);
-                  }
-                };
+                const uncertain = `${description}（届いたかは分かりません）`;
+                const others = () =>
+                  pending.changes.filter((text) => text !== description && text !== uncertain);
                 try {
                   const result = await step();
-                  record(description);
+                  pending.changes = [...others(), description];
                   return result;
                 } catch (error) {
                   // 記録しないと、捨てる変更の一覧から漏れ、何も変えていない edit として消してしまう
-                  if (mayHaveArrived(error)) {
-                    record(`${description}（届いたかは分かりません）`);
+                  if (mayHaveArrived(error) && !pending.changes.includes(description)) {
+                    pending.changes = [...others(), uncertain];
                   }
                   throw error;
                 }

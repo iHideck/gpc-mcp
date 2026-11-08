@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createClient } from '../plugin/src/client.ts';
+import { createClient, UnknownOutcomeError } from '../plugin/src/client.ts';
 import { createPlay } from '../plugin/src/edits.ts';
 import { listTracks, readTrack, writeTrack } from '../plugin/src/tracks.ts';
 import { apiError, fakePlay, type FakeRelease } from './fake-play.ts';
@@ -191,6 +191,36 @@ describe('まだ送っていない edit', () => {
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
     expect(fake.openEdits()).toEqual([]);
+  });
+
+  it('届いたか分からない変更をやり直して届いたら、確かな記録に置き換える', async () => {
+    const { play } = setup({
+      tracks: { production: [COMPLETED] },
+      failures: {
+        [`PUT /androidpublisher/v3/applications/${PACKAGE}/edits/edit-1/tracks/production`]:
+          apiError(503, 'unavailable'),
+      },
+    });
+
+    await expect(addDraft(play)).rejects.toThrow('503');
+    await addDraft(play);
+
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual(['下書きを足した']);
+  });
+
+  it('届いた変更をやり直して失敗しても、確かな記録のままにする', async () => {
+    const { play } = setup({ tracks: { production: [COMPLETED] } });
+    await addDraft(play);
+
+    await expect(
+      play.edits.write(PACKAGE, (edit) =>
+        edit.change('下書きを足した', async () => {
+          throw new UnknownOutcomeError('fetch failed');
+        }),
+      ),
+    ).rejects.toThrow('fetch failed');
+
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual(['下書きを足した']);
   });
 
   it('同じ変更は、一度だけ残す', async () => {
