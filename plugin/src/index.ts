@@ -11,6 +11,7 @@ import { createPlay } from './edits.ts';
 import { once } from './lazy.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
+import { PHASED_RELEASE_ACTIONS, saveDraft, setPhasedRelease, submitForReview } from './release.ts';
 import {
   IMAGE_TYPE_NAMES,
   IMAGE_TYPES,
@@ -40,13 +41,32 @@ const appArguments = {
   packageName: z.string().min(1).describe('アプリのパッケージ名（例: com.ihideck.machosterone）'),
 };
 
-const trackArgument = z
-  .string()
-  .min(1)
-  .default(DEFAULT_TRACK)
+const TRACK_DESCRIPTION =
+  'トラックの名前。production（製品版）・beta（オープンテスト）・alpha（クローズドテストの既定）・internal（内部テスト）か、Play Console で作ったクローズドテストの名前';
+
+const trackArgument = z.string().min(1).default(DEFAULT_TRACK).describe(TRACK_DESCRIPTION);
+
+// 外に出るツールでは省けない。既定の production に、別のトラックのつもりで出さないため
+const requiredTrackArgument = z.string().min(1).describe(TRACK_DESCRIPTION);
+
+const notSentForReviewArgument = z
+  .boolean()
+  .optional()
   .describe(
-    'トラックの名前。production（製品版）・beta（オープンテスト）・alpha（クローズドテストの既定）・internal（内部テスト）か、Play Console で作ったクローズドテストの名前',
+    'Google が審査に自動で送れない状態（却下のあとなど）のときに true にする。保存だけして、Play Console の [公開の概要] の [審査に送信] で送る',
   );
+
+const cancelChangesInReviewArgument = z
+  .boolean()
+  .optional()
+  .describe(
+    '審査中の変更があるときに、それを取り下げてから送るなら true。省くと、審査中の変更があれば送らない',
+  );
+
+const userFractionArgument = z.number().gt(0).lt(1);
+
+// 外に出る操作は、Claude Code が呼ぶたびに、利用者の確認を求める（どの権限のモードでも、許可の決まりでも省けない）
+const NEEDS_APPROVAL = { 'anthropic/requiresUserInteraction': true };
 
 const server = new McpServer({ name: 'gpc-mcp', version: packageJson.version });
 
@@ -221,6 +241,85 @@ server.registerTool(
     },
   },
   async (request) => json(await setAppInfo(await getPlay(), request)),
+);
+
+server.registerTool(
+  'save_draft',
+  {
+    title: '下書きのまま保存する',
+    description:
+      'まだ送っていない変更（pending）を、Google Play に保存する。リリースは下書きのまま残る。公開したことのないアプリは API では審査に出せないので、これで保存してから Play Console で審査に出す。掲載の文と画像の変更は、公開済みのアプリでは、保存すると Google の審査に送られる。審査中の変更があれば送らない。呼ぶたびに、利用者の確認が要る。保存した変更を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      cancelChangesInReview: cancelChangesInReviewArgument,
+      notSentForReview: notSentForReviewArgument,
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    _meta: NEEDS_APPROVAL,
+  },
+  async (request) => json(await saveDraft(await getPlay(), request)),
+);
+
+server.registerTool(
+  'submit_for_review',
+  {
+    title: '審査に出す',
+    description:
+      'トラックの下書きのリリースと、まだ送っていない変更（掲載の文・画像など）を、Google Play に送る。審査のあるトラックでは審査に出す。内部テスト（internal）は審査なしですぐ配信される。審査が通ると、管理対象の公開を切っていれば自動で公開される。userFraction を渡すと段階的公開にする。省くと全員に出す。下書きが無くても、掲載の文などの変更があれば、それを送る。審査中の変更があれば送らない。呼ぶたびに、利用者の確認が要る。送ったリリースの前と後、送った変更、審査の状態、気を付けること（warnings）を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      track: requiredTrackArgument,
+      userFraction: userFractionArgument
+        .optional()
+        .describe('段階的公開で配る割合（0 より大きく 1 より小さい。例: 0.2）'),
+      cancelChangesInReview: cancelChangesInReviewArgument,
+      notSentForReview: notSentForReviewArgument,
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    _meta: NEEDS_APPROVAL,
+  },
+  async (request) => json(await submitForReview(await getPlay(), request)),
+);
+
+server.registerTool(
+  'set_phased_release',
+  {
+    title: '段階的公開を変える',
+    description:
+      '進めている段階的公開を、止める（pause）・再開する（resume）・割合を変える（update）・全員に出す（complete）。全員に出すと、元に戻せない。もうその状態なら、そのまま返す。まだ送っていない変更（pending）があるときは、一緒に送られないように変えない。審査中の変更があれば送らない。呼ぶたびに、利用者の確認が要る。変える前と後を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      track: requiredTrackArgument,
+      action: z
+        .enum(PHASED_RELEASE_ACTIONS)
+        .describe(
+          'pause は止める、resume は再開する（userFraction を渡すと割合も変える）、update は進めている段階的公開の割合を変える（userFraction が要る）、complete は全員に出す',
+        ),
+      userFraction: userFractionArgument
+        .optional()
+        .describe('配る割合（0 より大きく 1 より小さい。例: 0.5）'),
+      cancelChangesInReview: cancelChangesInReviewArgument,
+      notSentForReview: notSentForReviewArgument,
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    _meta: NEEDS_APPROVAL,
+  },
+  async (request) => json(await setPhasedRelease(await getPlay(), request)),
 );
 
 server.registerTool(

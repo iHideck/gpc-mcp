@@ -44,6 +44,10 @@ export function isDraft(release: Release): boolean {
   return release.status === 'draft';
 }
 
+export function isRollout(release: Release): boolean {
+  return release.status === 'inProgress' || release.status === 'halted';
+}
+
 export async function listTracks(client: GpcClient, edit: ReadableEdit): Promise<Track[]> {
   const { tracks } = await client.get(`${edit.path}/tracks`, {}, TrackList);
   return (tracks ?? []).map(({ track, releases }) => ({ track, releases: releases ?? [] }));
