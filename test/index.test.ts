@@ -98,6 +98,17 @@ describe('MCP サーバー', () => {
         inputSchema: expect.objectContaining({ required: ['packageName', 'localizations'] }),
       }),
       expect.objectContaining({
+        name: 'replace_screenshots',
+        annotations: expect.objectContaining({
+          readOnlyHint: false,
+          destructiveHint: true,
+          idempotentHint: true,
+        }),
+        inputSchema: expect.objectContaining({
+          required: ['packageName', 'locale', 'imageType', 'files'],
+        }),
+      }),
+      expect.objectContaining({
         name: 'set_app_info',
         annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
