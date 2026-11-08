@@ -114,11 +114,40 @@ describe('MCP サーバー', () => {
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
       expect.objectContaining({
+        name: 'save_draft',
+        _meta: { 'anthropic/requiresUserInteraction': true },
+        inputSchema: expect.objectContaining({ required: ['packageName'] }),
+      }),
+      expect.objectContaining({
+        name: 'submit_for_review',
+        _meta: { 'anthropic/requiresUserInteraction': true },
+        inputSchema: expect.objectContaining({ required: ['packageName', 'track'] }),
+      }),
+      expect.objectContaining({
+        name: 'set_phased_release',
+        _meta: { 'anthropic/requiresUserInteraction': true },
+        inputSchema: expect.objectContaining({ required: ['packageName', 'track', 'action'] }),
+      }),
+      expect.objectContaining({
         name: 'discard_changes',
         annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
     ]);
+
+    const preparing = [
+      'upload_bundle',
+      'select_build',
+      'set_localizations',
+      'replace_screenshots',
+      'set_app_info',
+      'discard_changes',
+    ];
+    expect(
+      (listed.result?.tools as { name: string; _meta?: unknown }[])
+        .filter(({ name }) => preparing.includes(name))
+        .map(({ _meta }) => _meta),
+    ).toEqual(preparing.map(() => undefined));
 
     const called = await server.request('tools/call', { name: 'list_apps', arguments: {} });
     expect(called.result).toMatchObject({

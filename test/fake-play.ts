@@ -33,11 +33,36 @@ type Options = Partial<Snapshot> & {
   lifecycle?: Record<string, unknown[]>;
   failures?: Record<string, Response>;
   nextVersionCode?: number;
+  // 審査中の変更がある
+  inReview?: boolean;
+  // true なら Google が自動で審査に送る状態。false なら却下のあとなどで、手動で送る状態
+  autoReview?: boolean;
+  // まだ公開していないアプリ
+  draftApp?: boolean;
 };
 
 type Edit = { snapshot: Snapshot; invalidBecause?: string };
 
 const PUBLISHER_ORIGIN = 'https://androidpublisher.googleapis.com';
+
+function sentForReview(before: Snapshot, after: Snapshot): boolean {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const hasNewRelease = (track: string) =>
+    !/(^|:)(internal|qa)$/.test(track) &&
+    (after.tracks[track] ?? []).some(
+      ({ status, versionCodes }) =>
+        status !== 'draft' &&
+        !(before.tracks[track] ?? []).some(
+          (previous) => previous.status !== 'draft' && same(previous.versionCodes, versionCodes),
+        ),
+    );
+  return (
+    !same(before.details, after.details) ||
+    !same(before.listings, after.listings) ||
+    !same(before.images, after.images) ||
+    Object.keys(after.tracks).some(hasNewRelease)
+  );
+}
 
 export function apiError(status: number, message: string, reason?: string): Response {
   return jsonResponse(status, {
@@ -57,6 +82,9 @@ export function fakePlay({
   lifecycle = {},
   failures = {},
   nextVersionCode = 100,
+  inReview = false,
+  autoReview = true,
+  draftApp = false,
   ...initial
 }: Options = {}) {
   const live: Snapshot = {
@@ -142,6 +170,38 @@ export function fakePlay({
         tracks: Object.entries(snapshot.tracks).map(([track, releases]) => ({ track, releases })),
       });
     }
+    if (method === 'POST' && tail === ':commit') {
+      const behavior = url.searchParams.get('changesInReviewBehavior');
+      const notSent = url.searchParams.get('changesNotSentForReview') === 'true';
+      if (inReview && behavior !== 'CANCEL_IN_REVIEW_AND_SUBMIT') {
+        return jsonResponse(400, {
+          error: {
+            code: 400,
+            message: 'You already have changes in review.',
+            status: 'FAILED_PRECONDITION',
+            details: [{ reason: 'CHANGES_ALREADY_IN_REVIEW' }],
+          },
+        });
+      }
+      if (!autoReview && !notSent) {
+        return apiError(
+          400,
+          'Changes cannot be sent for review automatically. Please set the query parameter changesNotSentForReview to true.',
+        );
+      }
+      if (autoReview && notSent) {
+        return apiError(
+          400,
+          'Changes are sent for review automatically. The query parameter changesNotSentForReview must not be set.',
+        );
+      }
+      // 送った変更は審査中になる（内部テストと、下書きだけの変更は除く）
+      inReview = !notSent && sentForReview(live, snapshot);
+      Object.assign(live, snapshot);
+      invalidateAll('editExpired');
+      edit.invalidBecause = 'editAlreadyCommitted';
+      return jsonResponse(200, { id, expiryTimeSeconds: '1800000000' });
+    }
     if (route === 'PUT /details') {
       snapshot.details = JSON.parse(String(init?.body)) as Snapshot['details'];
       return jsonResponse(200, snapshot.details);
@@ -203,6 +263,9 @@ export function fakePlay({
       const statuses = releases.map(({ status }) => status);
       if (new Set(statuses).size !== statuses.length) {
         return apiError(400, 'Releases must have distinct statuses.');
+      }
+      if (draftApp && statuses.some((status) => status !== 'draft')) {
+        return apiError(403, 'Only releases with status draft may be created on draft app.');
       }
       snapshot.tracks[trackName] = releases;
       return jsonResponse(200, { track: trackName, releases });

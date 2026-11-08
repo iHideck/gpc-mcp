@@ -14,7 +14,11 @@ const ReleaseSummary = z.object({
 });
 const ReleaseSummaries = z.object({ releases: z.array(ReleaseSummary).optional() });
 
-type ReviewState = { releaseName: string | null; state: string | null; versionCodes: number[] };
+export type ReviewState = {
+  releaseName: string | null;
+  state: string | null;
+  versionCodes: number[];
+};
 
 type TrackStatus = { track: string; releases: ReleaseView[]; review: ReviewState[] | null };
 
@@ -54,7 +58,7 @@ export async function getReleaseStatus(
 }
 
 // 審査の状態が読めなくても、ビルドとリリースの状態は返す
-async function readReview(
+export async function readReview(
   client: GpcClient,
   packageName: string,
   track: string,

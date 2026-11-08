@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { appPath, GpcApiError, UnknownOutcomeError, type GpcClient } from './client.ts';
+import {
+  appPath,
+  GpcApiError,
+  UnknownOutcomeError,
+  type GpcClient,
+  type Params,
+} from './client.ts';
 
 export const AppEdit = z.object({ id: z.string(), expiryTimeSeconds: z.string().optional() });
 
@@ -12,8 +18,16 @@ type Pending = PendingSummary & { id: string };
 
 export type ReadableEdit = { path: string };
 
+export type CommitOptions = {
+  cancelChangesInReview?: boolean | undefined;
+  notSentForReview?: boolean | undefined;
+};
+
 export type WritableEdit = ReadableEdit & {
+  previousChanges: readonly string[];
   change<T>(description: string, work: () => Promise<T>): Promise<T>;
+  commit(options?: CommitOptions): Promise<void>;
+  abandon(): Promise<readonly string[]>;
 };
 
 export type Edits = {
@@ -119,10 +133,13 @@ function createEdits(client: GpcClient): Edits {
       return inOrder(async () => {
         const pending = (await currentPending(packageName)) ?? (await open(packageName));
         pendings.set(packageName, pending);
+        const path = pathOf(packageName, pending.id);
+        const previousChanges = [...pending.changes];
         try {
           return await guarded(packageName, pending, () =>
             work({
-              path: pathOf(packageName, pending.id),
+              path,
+              previousChanges,
               async change(description, step) {
                 const uncertain = `${description}（届いたかは分かりません）`;
                 const others = () =>
@@ -138,6 +155,15 @@ function createEdits(client: GpcClient): Edits {
                   }
                   throw error;
                 }
+              },
+              async commit(options = {}) {
+                await commit(client, path, options);
+                pendings.delete(packageName);
+              },
+              async abandon() {
+                pendings.delete(packageName);
+                await close(packageName, pending.id);
+                return [...pending.changes];
               },
             }),
           );
@@ -168,6 +194,40 @@ function createEdits(client: GpcClient): Edits {
       return pending === undefined || pending.changes.length === 0 ? null : summaryOf(pending);
     },
   };
+}
+
+async function commit(client: GpcClient, path: string, options: CommitOptions): Promise<void> {
+  const params: Params = {
+    // 省くと、審査中の変更を取り下げてから送る。頼まれないかぎり、審査を止めない
+    changesInReviewBehavior:
+      options.cancelChangesInReview === true ? 'CANCEL_IN_REVIEW_AND_SUBMIT' : 'ERROR_IF_IN_REVIEW',
+    ...(options.notSentForReview === true ? { changesNotSentForReview: 'true' } : {}),
+  };
+  try {
+    await client.post(`${path}:commit`, params, undefined, AppEdit);
+  } catch (error) {
+    throw error instanceof GpcApiError ? withCommitHint(error) : error;
+  }
+}
+
+function withCommitHint(error: GpcApiError): GpcApiError {
+  const hint = commitHint(error);
+  return hint === undefined
+    ? error
+    : new GpcApiError(error.status, `${hint}\n${error.message}`, error.reasons);
+}
+
+function commitHint(error: GpcApiError): string | undefined {
+  if (error.reasons.includes('CHANGES_ALREADY_IN_REVIEW')) {
+    return '審査中の変更があるので、送りませんでした。審査が終わるのを待つか、cancelChangesInReview: true で審査中の変更を取り下げて送ってください。';
+  }
+  if (error.message.includes('changesNotSentForReview to true')) {
+    return 'このアプリの変更は、自動では審査に送れません（却下のあとなど）。notSentForReview: true で保存し、Play Console の [公開の概要] の [審査に送信] で送ってください。';
+  }
+  if (error.message.includes('changesNotSentForReview must not be set')) {
+    return 'このアプリの変更は、自動で審査に送られます。notSentForReview を外してください。';
+  }
+  return undefined;
 }
 
 function mayHaveArrived(error: unknown): boolean {
