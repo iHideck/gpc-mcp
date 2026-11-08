@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { appPath, type GpcClient } from './client.ts';
 
-const AppEdit = z.object({ id: z.string() });
+export const AppEdit = z.object({ id: z.string() });
 
 export type ReadableEdit = { path: string };
 

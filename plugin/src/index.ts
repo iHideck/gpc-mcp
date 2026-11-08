@@ -4,7 +4,7 @@ import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
 import { listApps } from './apps.ts';
 import { createTokenSource, loadCredentials } from './auth.ts';
-import { createClient } from './client.ts';
+import { createClient, isReadOnly } from './client.ts';
 import { createPlay, type Play } from './edits.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
@@ -14,7 +14,13 @@ let play: Play | undefined;
 
 // 鍵は、ツールが初めて呼ばれたときに読む。鍵のファイルを置く前でもサーバーは起動し、ツールが置き場所を返す
 async function getPlay(): Promise<Play> {
-  play ??= createPlay(createClient(createTokenSource(await loadCredentials(process.env))));
+  play ??= createPlay(
+    createClient(
+      createTokenSource(await loadCredentials(process.env)),
+      fetch,
+      isReadOnly(process.env.GPC_READ_ONLY),
+    ),
+  );
   return play;
 }
 
