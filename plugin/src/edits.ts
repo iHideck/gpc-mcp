@@ -45,8 +45,18 @@ function createEdits(client: GpcClient): Edits {
     `${appPath(packageName)}/edits/${encodeURIComponent(id)}`;
 
   async function open(packageName: string): Promise<Pending> {
-    const edit = await client.post(`${appPath(packageName)}/edits`, {}, {}, AppEdit);
-    return { id: edit.id, expiresAt: isoOf(edit.expiryTimeSeconds), changes: [] };
+    try {
+      const edit = await client.post(`${appPath(packageName)}/edits`, {}, {}, AppEdit);
+      return { id: edit.id, expiresAt: isoOf(edit.expiryTimeSeconds), changes: [] };
+    } catch (error) {
+      throw error instanceof GpcApiError && error.status === 404
+        ? new GpcApiError(
+            404,
+            `${packageName} のアプリは Google Play にありません。パッケージ名を確かめてください。ビルドを1つも上げていないアプリは API で扱えないので、Play Console で最初の App Bundle を上げてください。\n${error.message}`,
+            error.reasons,
+          )
+        : error;
+    }
   }
 
   // 消せなくても、期限が切れるか、次の edit を作ると無効になる

@@ -9,7 +9,7 @@ const LocalizedText = z.object({ language: z.string(), text: z.string() });
 // 読んだリリースは、そのまま Google に送り返す。ツールが知らない項目（国の指定など）も落とさない
 export const Release = z.looseObject({
   name: z.string().optional(),
-  status: z.string(),
+  status: z.string().default('statusUnspecified'),
   versionCodes: z.array(z.string()).optional(),
   userFraction: z.number().optional(),
   releaseNotes: z.array(LocalizedText).optional(),

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createClient } from '../plugin/src/client.ts';
 import { createPlay } from '../plugin/src/edits.ts';
 import { listTracks, writeTrack } from '../plugin/src/tracks.ts';
-import { fakePlay, type FakeRelease } from './fake-play.ts';
+import { apiError, fakePlay, type FakeRelease } from './fake-play.ts';
 
 const PACKAGE = 'com.example.app';
 const COMPLETED: FakeRelease = { name: '1.0.0', status: 'completed', versionCodes: ['1'] };
@@ -118,6 +118,20 @@ describe('まだ送っていない edit', () => {
     ).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
+  });
+
+  it('アプリが無いときは、パッケージ名と最初のビルドのことを案内する', async () => {
+    const fake = fakePlay({
+      failures: {
+        [`POST /androidpublisher/v3/applications/${PACKAGE}/edits`]: apiError(
+          404,
+          'Package not found.',
+        ),
+      },
+    });
+    const play = createPlay(createClient(async () => 'TOKEN', fake.fetch));
+
+    await expect(statuses(play)).rejects.toThrow(/最初の App Bundle を上げて[\s\S]*not found/);
   });
 
   it('捨てると、edit を消し、捨てた変更を返す。何も無ければ null を返す', async () => {
