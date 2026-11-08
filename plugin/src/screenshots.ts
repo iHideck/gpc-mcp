@@ -136,22 +136,26 @@ export async function replaceScreenshots(
       pending: edits.pending(packageName),
       warnings,
     });
+    // 途中で止まると、前の画像が消えたまま送られることがある。止まったことが pending で分かるようにする
+    const unfinished = `${locale} の ${imageType} を入れ替える途中（画像がそろっていません）`;
+    const finished = `${locale} の ${imageType} を入れ替えた`;
     if (sameImages(before, images)) {
+      edit.finishChange(unfinished, finished);
       return result([], 0, before);
     }
     const progress = trackProgress();
-    const change = `${locale} の ${imageType} を入れ替えた`;
     // 順番を変える API が無いので、入れ直して順番をそろえる
     if (before.length > 0) {
       await progress.write('前の画像を消す', '前の画像を消しました', () =>
-        edit.change(change, () => client.remove(path)),
+        edit.change(unfinished, () => client.remove(path)),
       );
     }
     for (const { fileName, bytes, contentType } of images) {
       await progress.write(`${fileName} を上げる`, `${fileName} を上げました`, () =>
-        edit.change(change, () => client.upload(path, { contentType, bytes }, ImageUpload)),
+        edit.change(unfinished, () => client.upload(path, { contentType, bytes }, ImageUpload)),
       );
     }
+    edit.finishChange(unfinished, finished);
     const after = await readImages(client, path);
     return result(
       images.map(({ fileName }) => fileName),

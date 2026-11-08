@@ -214,6 +214,55 @@ describe('replaceScreenshots', () => {
     ).rejects.toThrow('絶対パスで渡してください');
   });
 
+  it('途中で止まると、画像がそろっていないことが、まだ送っていない変更で分かる', async () => {
+    const { play } = setup({
+      images: { 'ja-JP/phoneScreenshots': [{ id: 'old', sha256: 'old', sha1: 'x', url: 'u' }] },
+      failures: {
+        [`POST /upload/androidpublisher/v3/applications/${PACKAGE}/edits/edit-1/listings/ja-JP/phoneScreenshots`]:
+          apiError(400, 'bad image'),
+      },
+    });
+
+    await expect(
+      replaceScreenshots(
+        play,
+        request('phoneScreenshots', [await write('1.png', png(1080, 1920))]),
+      ),
+    ).rejects.toThrow('前の画像を消しました。1.png を上げるところで止まりました');
+
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual([
+      'ja-JP の phoneScreenshots を入れ替える途中（画像がそろっていません）',
+    ]);
+  });
+
+  it('全部届いていたのに応答が失われたら、やり直しで完了の記録にする', async () => {
+    const one = png(1080, 1920);
+    const file = await write('1.png', one);
+    const { fake, play } = setup();
+    const original = fake.fetch.getMockImplementation() as typeof fetch;
+    let dropped = false;
+    fake.fetch.mockImplementation(async (input, init) => {
+      const response = await original(input, init);
+      if (String(input).includes('/upload/') && !dropped) {
+        dropped = true;
+        throw new TypeError('fetch failed');
+      }
+      return response;
+    });
+
+    await expect(replaceScreenshots(play, request('phoneScreenshots', [file]))).rejects.toThrow(
+      '届いたかは分かりません',
+    );
+    expect(play.edits.pending(PACKAGE)?.changes).toEqual([
+      'ja-JP の phoneScreenshots を入れ替える途中（画像がそろっていません）（届いたかは分かりません）',
+    ]);
+
+    const retried = await replaceScreenshots(play, request('phoneScreenshots', [file]));
+
+    expect(retried.uploaded).toEqual([]);
+    expect(retried.pending?.changes).toEqual(['ja-JP の phoneScreenshots を入れ替えた']);
+  });
+
   it('途中で止まっても、やり直すと全部がそろう', async () => {
     const [one, two] = [png(1080, 1920, 2, 1), png(1080, 1920, 2, 2)] as const;
     const files = [await write('1.png', one), await write('2.png', two)];
