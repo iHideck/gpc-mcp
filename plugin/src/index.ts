@@ -11,6 +11,12 @@ import { createPlay } from './edits.ts';
 import { once } from './lazy.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
+import {
+  IMAGE_TYPE_NAMES,
+  IMAGE_TYPES,
+  MAX_IMAGE_FILES,
+  replaceScreenshots,
+} from './screenshots.ts';
 import { selectBuild } from './select-build.ts';
 import { localizationInput, setLocalizations } from './set-localizations.ts';
 import { DEFAULT_TRACK } from './tracks.ts';
@@ -154,6 +160,36 @@ server.registerTool(
     },
   },
   async (request) => json(await setLocalizations(await getPlay(), request)),
+);
+
+server.registerTool(
+  'replace_screenshots',
+  {
+    title: '画面写真を入れ替える',
+    description:
+      '1つの言語の1つの種類（imageType）の画像を、渡したファイルに入れ替え、渡した順に並べる。画面写真のほか、アイコン・フィーチャーグラフィック・TV のバナーも入れられる。送る前に、全部のファイルが PNG か JPEG かと、大きさが規格に合うかを確かめ、1つでも合わなければ何も変えない。同じ画像（SHA-256 が同じもの）が同じ順で入っていれば、何もしない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。入れ替える前と後の画像の一覧と、気を付けること（warnings）を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      locale: z.string().min(1).describe('画像を入れ替える言語（例: ja-JP）'),
+      imageType: z.enum(IMAGE_TYPE_NAMES).describe(
+        `入れ替える画像の種類: ${Object.entries(IMAGE_TYPES)
+          .map(([name, { label }]) => `${name}（${label}）`)
+          .join('。')}`,
+      ),
+      files: z
+        .array(z.string().min(1))
+        .min(1)
+        .max(MAX_IMAGE_FILES)
+        .describe('入れる画像（PNG か JPEG）のファイルの絶対パス。並べたい順に渡す'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await replaceScreenshots(await getPlay(), request)),
 );
 
 server.registerTool(

@@ -25,6 +25,8 @@ type Snapshot = {
   tracks: Record<string, FakeRelease[]>;
   bundles: { versionCode: number; sha256: string; sha1: string }[];
   apks: { versionCode: number; binary: { sha256: string; sha1: string } }[];
+  // 「言語/種類」の名前で持つ
+  images: Record<string, { id: string; sha256: string; sha1: string; url: string }[]>;
 };
 
 type Options = Partial<Snapshot> & {
@@ -63,10 +65,12 @@ export function fakePlay({
     tracks: { production: [] },
     bundles: [],
     apks: [],
+    images: {},
     ...structuredClone(initial),
   };
   const edits = new Map<string, Edit>();
   let nextEdit = 1;
+  let nextImage = 1;
   const failing = new Map(Object.entries(failures));
 
   function invalidateAll(reason: string): void {
@@ -141,6 +145,31 @@ export function fakePlay({
     if (route === 'PUT /details') {
       snapshot.details = JSON.parse(String(init?.body)) as Snapshot['details'];
       return jsonResponse(200, snapshot.details);
+    }
+    const imageTarget = /^\/listings\/([^/]+)\/([^/]+)$/.exec(tail);
+    if (imageTarget !== null) {
+      const [, language = '', imageType = ''] = imageTarget;
+      if (!snapshot.listings.some((listing) => listing.language === language)) {
+        return apiError(404, `Listing ${language} not found.`, 'notFound');
+      }
+      const key = `${language}/${imageType}`;
+      if (method === 'GET') {
+        return jsonResponse(200, { images: snapshot.images[key] ?? [] });
+      }
+      if (method === 'DELETE') {
+        const deleted = snapshot.images[key] ?? [];
+        snapshot.images[key] = [];
+        return jsonResponse(200, { deleted });
+      }
+      const bytes = init?.body as Uint8Array<ArrayBuffer>;
+      const image = {
+        id: `image-${nextImage++}`,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        sha1: createHash('sha1').update(bytes).digest('hex'),
+        url: 'https://example.com/image',
+      };
+      snapshot.images[key] = [...(snapshot.images[key] ?? []), image];
+      return jsonResponse(200, { image });
     }
     const listingLanguage = /^\/listings\/([^/]+)$/.exec(tail)?.[1];
     if (listingLanguage !== undefined && method === 'PUT') {
