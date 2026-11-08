@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+const PUBLISHER_ORIGIN = 'https://androidpublisher.googleapis.com';
 const REPORTING_ORIGIN = 'https://playdeveloperreporting.googleapis.com';
 const TIMEOUT_MS = 30_000;
 
@@ -17,9 +18,18 @@ export class GpcApiError extends Error {
 
 export type Params = Record<string, string>;
 
+type Method = 'GET' | 'POST' | 'DELETE';
+
 export type GpcClient = {
+  get<T>(path: string, params: Params, schema: z.ZodType<T>): Promise<T>;
+  post<T>(path: string, params: Params, body: object | undefined, schema: z.ZodType<T>): Promise<T>;
+  remove(path: string): Promise<void>;
   getReporting<T>(path: string, params: Params, schema: z.ZodType<T>): Promise<T>;
 };
+
+export function appPath(packageName: string): string {
+  return `/androidpublisher/v3/applications/${encodeURIComponent(packageName)}`;
+}
 
 const ErrorBody = z.object({
   error: z.object({
@@ -49,13 +59,17 @@ export function createClient(
   token: () => Promise<string>,
   fetchFn: typeof fetch = fetch,
 ): GpcClient {
-  async function call(url: URL): Promise<unknown> {
+  async function call(method: Method, url: URL, body?: object): Promise<unknown> {
     const authorization = `Bearer ${await token()}`;
     let response: Response;
     try {
       response = await fetchFn(url, {
-        method: 'GET',
-        headers: { Authorization: authorization },
+        method,
+        headers: {
+          Authorization: authorization,
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        body: body === undefined ? null : JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch (error) {
@@ -71,8 +85,17 @@ export function createClient(
   }
 
   return {
+    async get(path, params, schema) {
+      return parse(schema, await call('GET', urlOf(PUBLISHER_ORIGIN, path, params)), path);
+    },
+    async post(path, params, body, schema) {
+      return parse(schema, await call('POST', urlOf(PUBLISHER_ORIGIN, path, params), body), path);
+    },
+    async remove(path) {
+      await call('DELETE', urlOf(PUBLISHER_ORIGIN, path, {}));
+    },
     async getReporting(path, params, schema) {
-      return parse(schema, await call(urlOf(REPORTING_ORIGIN, path, params)), path);
+      return parse(schema, await call('GET', urlOf(REPORTING_ORIGIN, path, params)), path);
     },
   };
 }

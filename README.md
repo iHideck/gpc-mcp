@@ -9,6 +9,8 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | Tool | What it does |
 | :- | :- |
 | `list_apps` | Returns the name and package name of each app. |
+| `get_release_status` | Returns the five newest builds, the releases on each track, and the review state of each release. |
+| `get_localizations` | Returns the store listing text for each language (title, short description, full description, and video URL), the default language, and the release notes of a track. |
 
 ## Install
 
