@@ -1,0 +1,41 @@
+# gpc-mcp
+
+English | [日本語](README.ja.md)
+
+An unofficial MCP server for the Google Play Developer API. Install it as a Claude Code plugin, then ask Claude Code to do your Google Play release work.
+
+## Tools
+
+| Tool | What it does |
+| :- | :- |
+| `list_apps` | Returns the name and package name of each app. |
+
+## Install
+
+The MCP server runs on the Node in your PATH. It requires Node 24 or later.
+
+1. In the Google Cloud console, choose a project and enable the **Google Play Android Developer API** and the **Google Play Developer Reporting API**. Then create a service account and download a JSON key for it.
+2. Move the JSON key to a path of your choice, for example `~/.config/gpc-mcp/service-account.json`. Run `chmod 600` on the file so that only you can read it.
+3. In Play Console, go to **Users and permissions** and invite the service account by its email address. For each app, grant these permissions:
+   - **View app information (read-only)**
+   - **Release to production, exclude devices, and use Play App Signing**
+   - **Release apps to testing tracks**
+   - **Manage store presence**
+4. In Claude Code, run these commands:
+
+   ```
+   /plugin marketplace add iHideck/gpc-mcp
+   /plugin install gpc-mcp@gpc-mcp
+   ```
+
+5. On the configuration screen, enter the path of the JSON key. To change it later, run `/plugin configure gpc-mcp@gpc-mcp`.
+
+## Development
+
+The plugin is in `plugin/`. With the plugin, Claude Code installs only the dependencies in `plugin/package.json`. Keep development tools such as ESLint in the root `package.json`.
+
+| Command | What it does |
+| :- | :- |
+| `make setup` | Installs the dependencies. |
+| `make check` | Runs the same checks as CI (ESLint, formatting, type checks, and tests). |
+| `make validate-plugin` | Validates the plugin and marketplace configuration. |
