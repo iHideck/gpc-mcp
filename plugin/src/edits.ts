@@ -26,6 +26,7 @@ export type CommitOptions = {
 export type WritableEdit = ReadableEdit & {
   previousChanges: readonly string[];
   change<T>(description: string, work: () => Promise<T>): Promise<T>;
+  finishChange(unfinished: string, finished: string): void;
   commit(options?: CommitOptions): Promise<void>;
   abandon(): Promise<readonly string[]>;
 };
@@ -141,7 +142,7 @@ function createEdits(client: GpcClient): Edits {
               path,
               previousChanges,
               async change(description, step) {
-                const uncertain = `${description}（届いたかは分かりません）`;
+                const uncertain = uncertainOf(description);
                 const others = () =>
                   pending.changes.filter((text) => text !== description && text !== uncertain);
                 try {
@@ -154,6 +155,15 @@ function createEdits(client: GpcClient): Edits {
                     pending.changes = [...others(), uncertain];
                   }
                   throw error;
+                }
+              },
+              finishChange(unfinished, finished) {
+                const stale = [unfinished, uncertainOf(unfinished)];
+                if (pending.changes.some((text) => stale.includes(text))) {
+                  pending.changes = [
+                    ...pending.changes.filter((text) => !stale.includes(text) && text !== finished),
+                    finished,
+                  ];
                 }
               },
               async commit(options = {}) {
@@ -228,6 +238,10 @@ function commitHint(error: GpcApiError): string | undefined {
     return 'このアプリの変更は、自動で審査に送られます。notSentForReview を外してください。';
   }
   return undefined;
+}
+
+function uncertainOf(description: string): string {
+  return `${description}（届いたかは分かりません）`;
 }
 
 function mayHaveArrived(error: unknown): boolean {
