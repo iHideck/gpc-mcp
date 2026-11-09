@@ -21,7 +21,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `set_phased_release` | Pauses, resumes, changes the percentage of, or completes a staged rollout. You cannot undo a release to all users. Each call requires your confirmation. |
 | `discard_changes` | Discards all changes that you have not sent to Google Play. |
 
-Tools that prepare a release write to *unsent changes*. Google Play receives nothing until `submit_for_review` or `save_draft` runs. Unsent changes are lost when they expire, when someone changes the app in Play Console, or when Claude Code restarts. They can also be lost when you work on another app, because Google documents one open edit per user. The tools report the loss.
+Tools that prepare a release write to *unsent changes*. Google Play receives nothing until `submit_for_review` or `save_draft` runs. Unsent changes stay across Claude Code restarts. They are lost when they expire or when someone changes the app in Play Console. They can also be lost when you work on another app, because Google documents one open edit per user. The tools report the loss.
 
 The Google Play API has no way to set the category, price, countries, or App content declarations, to publish an update held by managed publishing, or to withdraw a review. Do these in Play Console.
 
