@@ -251,10 +251,12 @@ export async function setPhasedRelease(
       before: viewOf(release),
       after: viewOf(release),
     });
+    const completed = releases.find(({ status }) => status === 'completed');
     const rollout =
-      releases.find(({ status }) => status === 'inProgress') ?? releases.find(isRollout);
+      releases.find(({ status }) => status === 'inProgress') ??
+      releases.find(isRollout) ??
+      (action === 'pause' ? completed : undefined);
     if (rollout === undefined) {
-      const completed = releases.find(({ status }) => status === 'completed');
       if (action === 'complete' && completed !== undefined) {
         return unchanged(completed);
       }
