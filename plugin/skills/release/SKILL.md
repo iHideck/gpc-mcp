@@ -49,9 +49,10 @@ API でできないものがあるので、Play Console の画面と組み合わ
 
 ## 3. 審査に出す
 
-1. 利用者に、トラック・ビルド・段階的公開の割合・リリースノート（全文）・`pending.changes`（一緒に送る変更）を見せる
-2. 利用者がよいと言ったら、`submit_for_review` を呼ぶ。`track` は省けない。`userFraction` を渡すと段階的公開になる
-3. 出したあとは、`get_release_status` の `review` で状態を見る。審査の結果が出るまで、数時間から7日以上かかることがある
+1. `validate_changes` で、まだ送っていない変更を Google の検査に通す。`valid` が `false` なら、`problem` を直す
+2. 利用者に、トラック・ビルド・段階的公開の割合・リリースノート（全文）・`pending.changes`（一緒に送る変更）を見せる
+3. 利用者がよいと言ったら、`submit_for_review` を呼ぶ。`track` は省けない。`userFraction` を渡すと段階的公開になる
+4. 出したあとは、`get_release_status` の `review` で状態を見る。審査の結果が出るまで、数時間から7日以上かかることがある
 
 内部テスト（`internal`）のトラックには審査が無く、すぐ配信される。
 

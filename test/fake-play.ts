@@ -170,6 +170,9 @@ export function fakePlay({
         tracks: Object.entries(snapshot.tracks).map(([track, releases]) => ({ track, releases })),
       });
     }
+    if (method === 'POST' && tail === ':validate') {
+      return jsonResponse(200, { id, expiryTimeSeconds: '1800000000' });
+    }
     if (method === 'POST' && tail === ':commit') {
       const behavior = url.searchParams.get('changesInReviewBehavior');
       const notSent = url.searchParams.get('changesNotSentForReview') === 'true';

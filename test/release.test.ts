@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createClient } from '../plugin/src/client.ts';
 import { createPlay } from '../plugin/src/edits.ts';
-import { saveDraft, setPhasedRelease, submitForReview } from '../plugin/src/release.ts';
+import {
+  saveDraft,
+  setPhasedRelease,
+  submitForReview,
+  validateChanges,
+} from '../plugin/src/release.ts';
 import { setAppInfo } from '../plugin/src/app-info.ts';
 import { selectBuild } from '../plugin/src/select-build.ts';
-import { fakePlay, type FakeRelease } from './fake-play.ts';
+import { apiError, fakePlay, type FakeRelease } from './fake-play.ts';
 
 const PACKAGE = 'com.example.app';
 const COMPLETED: FakeRelease = { name: '1.0.0', status: 'completed', versionCodes: ['1'] };
@@ -113,6 +118,62 @@ describe('saveDraft', () => {
 
     expect(fake.live.details.contactEmail).toBe(DETAILS.contactEmail);
     expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
+  });
+});
+
+describe('validateChanges', () => {
+  const VALIDATE = `POST /androidpublisher/v3/applications/${PACKAGE}/edits/edit-1:validate`;
+
+  it('まだ送っていない変更を検査に通し、何も送らず、変更は残す', async () => {
+    const { fake, play } = setup();
+    await changeEmail({ play });
+
+    const result = await validateChanges(play, PACKAGE);
+
+    expect(result).toEqual({
+      packageName: PACKAGE,
+      valid: true,
+      problem: null,
+      changes: ['App の情報（contactEmail）を変えた'],
+    });
+    expect(fake.live.details.contactEmail).toBe(DETAILS.contactEmail);
+    expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
+  });
+
+  it('検査で断られたら、理由を返し、変更は残す', async () => {
+    const { play } = setup({ failures: { [VALIDATE]: apiError(400, 'Listing is incomplete.') } });
+    await changeEmail({ play });
+
+    const result = await validateChanges(play, PACKAGE);
+
+    expect(result.valid).toBe(false);
+    expect(result.problem).toContain('Listing is incomplete.');
+    expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
+  });
+
+  it('変更が無ければ検査しない', async () => {
+    const { fake, play } = setup();
+
+    expect(await validateChanges(play, PACKAGE)).toMatchObject({ valid: null, changes: [] });
+
+    expect(fake.requests().some((request) => request.endsWith(':validate'))).toBe(false);
+    expect(fake.openEdits()).toEqual([]);
+  });
+
+  it('edit が無効になっていたら、断られた扱いにせず、失われた変更を知らせる', async () => {
+    const { play } = setup({
+      failures: { [VALIDATE]: apiError(400, 'This Edit has been deleted.', 'editDeleted') },
+    });
+    await changeEmail({ play });
+
+    await expect(validateChanges(play, PACKAGE)).rejects.toThrow('無効になりました');
+  });
+
+  it('5xx は、断られた扱いにしない', async () => {
+    const { play } = setup({ failures: { [VALIDATE]: apiError(503, 'unavailable') } });
+    await changeEmail({ play });
+
+    await expect(validateChanges(play, PACKAGE)).rejects.toThrow('503');
   });
 });
 
