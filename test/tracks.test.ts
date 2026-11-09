@@ -5,7 +5,7 @@ import { createTrack } from '../plugin/src/tracks.ts';
 import { fakePlay } from './fake-play.ts';
 
 const PACKAGE = 'com.example.app';
-const request = { packageName: PACKAGE, track: 'closed-1', formFactor: 'DEFAULT' as const };
+const request = { packageName: PACKAGE, track: 'closed-1' };
 
 function setup() {
   const fake = fakePlay({ tracks: { production: [], alpha: [] } });
@@ -35,18 +35,32 @@ describe('createTrack', () => {
     expect(fake.openEdits()).toEqual([]);
   });
 
-  it('Wear OS のトラックは、機種の種類を付けて作る', async () => {
+  it.each([
+    ['closed-1', 'DEFAULT'],
+    ['wear:closed-1', 'WEAR'],
+    ['automotive:closed-1', 'AUTOMOTIVE'],
+  ])('%s は、名前に合う機種の種類（%s）で作る', async (track, formFactor) => {
     const { fake, play } = setup();
 
-    await createTrack(play, { ...request, track: 'wear:closed-1', formFactor: 'WEAR' });
+    await createTrack(play, { ...request, track });
 
     const call = fake.fetch.mock.calls.find(([input, init]) => {
       return init?.method === 'POST' && String(input).endsWith('/tracks');
     });
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({
-      track: 'wear:closed-1',
+      track,
       type: 'CLOSED_TESTING',
-      formFactor: 'WEAR',
+      formFactor,
     });
+  });
+
+  it('対応していない接頭辞は、何も送らずに断る', async () => {
+    const { fake, play } = setup();
+
+    await expect(createTrack(play, { ...request, track: 'tv:closed-1' })).rejects.toThrow(
+      '対応していません',
+    );
+
+    expect(fake.requests()).toEqual([]);
   });
 });

@@ -101,13 +101,13 @@ export async function writeTrack(
   return updated.releases ?? [];
 }
 
-export const FORM_FACTORS = ['DEFAULT', 'WEAR', 'AUTOMOTIVE'] as const;
-
-export type CreateTrackRequest = {
-  packageName: string;
-  track: string;
-  formFactor: (typeof FORM_FACTORS)[number];
+// Google の仕様では、名前の接頭辞と formFactor が一致していなければならない
+const FORM_FACTOR_OF_PREFIX: Partial<Record<string, string>> = {
+  wear: 'WEAR',
+  automotive: 'AUTOMOTIVE',
 };
+
+export type CreateTrackRequest = { packageName: string; track: string };
 
 export type CreatedTrack = {
   packageName: string;
@@ -118,8 +118,9 @@ export type CreatedTrack = {
 
 export async function createTrack(
   { client, edits }: Play,
-  { packageName, track, formFactor }: CreateTrackRequest,
+  { packageName, track }: CreateTrackRequest,
 ): Promise<CreatedTrack> {
+  const formFactor = formFactorOf(track);
   return edits.write(packageName, async (edit) => {
     const exists = (await listTracks(client, edit)).some(({ track: name }) => name === track);
     if (!exists) {
@@ -134,6 +135,21 @@ export async function createTrack(
     }
     return { packageName, track, created: !exists, pending: edits.pending(packageName) };
   });
+}
+
+function formFactorOf(track: string): string {
+  const separator = track.indexOf(':');
+  if (separator === -1) {
+    return 'DEFAULT';
+  }
+  const prefix = track.slice(0, separator);
+  const formFactor = FORM_FACTOR_OF_PREFIX[prefix];
+  if (formFactor === undefined) {
+    throw new Error(
+      `トラックの名前の接頭辞 ${prefix}: には、対応していません。クローズドテストのトラックを作れるのは、接頭辞なし（電話）・wear:・automotive: だけです。`,
+    );
+  }
+  return formFactor;
 }
 
 function trackPath(edit: ReadableEdit, name: string): string {
