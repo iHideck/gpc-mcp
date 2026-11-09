@@ -106,7 +106,7 @@ function createEdits(client: GpcClient, store: PendingStore): Edits {
       throw error instanceof GpcApiError && error.status === 404
         ? new GpcApiError(
             404,
-            `${packageName} のアプリは Google Play にありません。パッケージ名を確かめてください。ビルドを1つも上げていないアプリは API で扱えないので、Play Console で最初の App Bundle を上げてください。\n${error.message}`,
+            `${packageName} のアプリが見つかりません。次を確かめてください。\n- パッケージ名が合っているか\n- Play Console の [ユーザーと権限] で、サービスアカウントにこのアプリの権限を与えたか（権限が無くても 404 になります）\n- ビルドを1つでも上げたか（ビルドの無いアプリは API で扱えないので、最初の App Bundle は Play Console で上げてください）\n${error.message}`,
             error.reasons,
           )
         : error;
