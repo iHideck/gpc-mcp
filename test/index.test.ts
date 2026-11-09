@@ -80,6 +80,11 @@ describe('MCP サーバー', () => {
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
       expect.objectContaining({
+        name: 'create_track',
+        annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
+        inputSchema: expect.objectContaining({ required: ['packageName', 'track'] }),
+      }),
+      expect.objectContaining({
         name: 'get_testers',
         annotations: readOnly,
         inputSchema: expect.objectContaining({ required: ['packageName', 'track'] }),
@@ -163,6 +168,7 @@ describe('MCP サーバー', () => {
     ]);
 
     const preparing = [
+      'create_track',
       'set_testers',
       'upload_bundle',
       'select_build',

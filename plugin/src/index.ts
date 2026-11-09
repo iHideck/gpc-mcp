@@ -31,7 +31,7 @@ import {
 import { selectBuild } from './select-build.ts';
 import { localizationInput, setLocalizations } from './set-localizations.ts';
 import { getTesters, setTesters } from './testers.ts';
-import { DEFAULT_TRACK } from './tracks.ts';
+import { createTrack, DEFAULT_TRACK, FORM_FACTORS } from './tracks.ts';
 
 // 鍵は、ツールが初めて呼ばれたときに読む。鍵のファイルを置く前でもサーバーは起動し、ツールが置き場所を返す
 const getPlay = once(async () =>
@@ -141,6 +141,32 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   async (request) => json(await getAvailability(await getPlay(), request)),
+);
+
+server.registerTool(
+  'create_track',
+  {
+    title: 'クローズドテストのトラックを作る',
+    description:
+      'クローズドテストのトラックを作る。もうあれば何もしない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。作ったかどうか（created）を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      track: z
+        .string()
+        .min(1)
+        .describe(
+          '新しいトラックの名前。Wear OS と Automotive OS は wear: と automotive: で始める',
+        ),
+      formFactor: z.enum(FORM_FACTORS).default('DEFAULT').describe('トラックの機種の種類'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await createTrack(await getPlay(), request)),
 );
 
 server.registerTool(
