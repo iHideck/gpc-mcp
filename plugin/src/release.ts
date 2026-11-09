@@ -302,6 +302,8 @@ function applyAction(
     case 'complete': {
       const completed: Release = { ...rollout, status: 'completed' };
       delete completed.userFraction;
+      // Google の仕様では、国の指定は段階的公開のときだけ付けられる
+      delete completed.countryTargeting;
       return completed;
     }
   }
