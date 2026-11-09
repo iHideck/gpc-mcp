@@ -93,7 +93,8 @@ server.registerTool(
   'list_apps',
   {
     title: 'アプリの一覧',
-    description: 'Google Play Console にあるアプリの、名前とパッケージ名を返す。',
+    description:
+      'Google Play Console にあるアプリの、名前とパッケージ名を返す。Play Console の [ユーザーと権限] でサービスアカウントにアプリの権限を与えていないと、空の一覧になる。',
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   async () => json({ apps: await listApps((await getPlay()).client) }),

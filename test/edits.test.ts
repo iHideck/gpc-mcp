@@ -138,7 +138,9 @@ describe('まだ送っていない edit', () => {
     });
     const play = createPlay(createClient(async () => 'TOKEN', fake.fetch));
 
-    await expect(statuses(play)).rejects.toThrow(/最初の App Bundle を上げて[\s\S]*not found/);
+    await expect(statuses(play)).rejects.toThrow(
+      /ユーザーと権限[\s\S]*最初の App Bundle は Play Console で上げて[\s\S]*not found/,
+    );
   });
 
   it('届いたのに応答が失われた変更も、届いたか分からない変更として残す', async () => {
