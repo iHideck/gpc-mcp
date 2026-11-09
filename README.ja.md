@@ -12,6 +12,7 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `get_release_status` | 新しい5つのビルドと、トラックごとのリリースと、リリースごとの審査の状態を返す |
 | `get_localizations` | 言語ごとのストアの掲載情報（タイトル・簡単な説明・詳しい説明・動画の URL）と、既定の言語と、トラックのリリースノートを返す |
 | `get_availability` | トラックの配信する国を返す |
+| `create_track` | クローズドテストのトラックを作る |
 | `get_testers` | テストのトラックの、テスターの Google グループを返す |
 | `set_testers` | テストのトラックの、テスターの Google グループを入れる。メールのリストは API で扱えない |
 | `upload_bundle` | App Bundle を、まだ送っていない変更に上げる。同じファイルがあれば上げ直さない |

@@ -12,6 +12,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `get_release_status` | Returns the five newest builds, the releases on each track, and the review state of each release. |
 | `get_localizations` | Returns the store listing text for each language (title, short description, full description, and video URL), the default language, and the release notes of a track. |
 | `get_availability` | Returns the countries where a track is available. |
+| `create_track` | Creates a closed testing track. |
 | `get_testers` | Returns the Google Groups of testers for a testing track. |
 | `set_testers` | Replaces the Google Groups of testers for a testing track. Email lists are not available in the API. |
 | `upload_bundle` | Uploads an Android App Bundle to the unsent changes. Does not upload a file that Google Play already has. |

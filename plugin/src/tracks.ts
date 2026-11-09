@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { GpcApiError, type GpcClient } from './client.ts';
-import { isGone, type ReadableEdit, type WritableEdit } from './edits.ts';
+import {
+  isGone,
+  type PendingSummary,
+  type Play,
+  type ReadableEdit,
+  type WritableEdit,
+} from './edits.ts';
 
 export const DEFAULT_TRACK = 'production';
 
@@ -93,6 +99,41 @@ export async function writeTrack(
 ): Promise<Release[]> {
   const updated = await client.put(trackPath(edit, name), { track: name, releases }, TrackResource);
   return updated.releases ?? [];
+}
+
+export const FORM_FACTORS = ['DEFAULT', 'WEAR', 'AUTOMOTIVE'] as const;
+
+export type CreateTrackRequest = {
+  packageName: string;
+  track: string;
+  formFactor: (typeof FORM_FACTORS)[number];
+};
+
+export type CreatedTrack = {
+  packageName: string;
+  track: string;
+  created: boolean;
+  pending: PendingSummary | null;
+};
+
+export async function createTrack(
+  { client, edits }: Play,
+  { packageName, track, formFactor }: CreateTrackRequest,
+): Promise<CreatedTrack> {
+  return edits.write(packageName, async (edit) => {
+    const exists = (await listTracks(client, edit)).some(({ track: name }) => name === track);
+    if (!exists) {
+      await edit.change(`クローズドテストのトラック ${track} を作った`, () =>
+        client.post(
+          `${edit.path}/tracks`,
+          {},
+          { track, type: 'CLOSED_TESTING', formFactor },
+          TrackResource,
+        ),
+      );
+    }
+    return { packageName, track, created: !exists, pending: edits.pending(packageName) };
+  });
 }
 
 function trackPath(edit: ReadableEdit, name: string): string {

@@ -277,6 +277,11 @@ export function fakePlay({
       snapshot.bundles.push(bundle);
       return jsonResponse(200, bundle);
     }
+    if (route === 'POST /tracks') {
+      const { track } = JSON.parse(String(init?.body)) as { track: string };
+      snapshot.tracks[track] = [];
+      return jsonResponse(200, { track, releases: [] });
+    }
     const trackName = /^\/tracks\/(.+)$/.exec(tail)?.[1];
     if (trackName !== undefined && method === 'GET') {
       // リリースが無いトラックは、無いトラックと同じ 404 になる（fastlane と Gradle Play Publisher が前提にしている）
