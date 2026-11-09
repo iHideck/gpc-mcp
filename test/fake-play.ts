@@ -25,6 +25,7 @@ type Snapshot = {
   tracks: Record<string, FakeRelease[]>;
   bundles: { versionCode: number; sha256: string; sha1: string }[];
   apks: { versionCode: number; binary: { sha256: string; sha1: string } }[];
+  testers: Record<string, string[]>;
   // 「言語/種類」の名前で持つ
   images: Record<string, { id: string; sha256: string; sha1: string; url: string }[]>;
 };
@@ -96,6 +97,7 @@ export function fakePlay({
     bundles: [],
     apks: [],
     images: {},
+    testers: {},
     ...structuredClone(initial),
   };
   const edits = new Map<string, Edit>();
@@ -250,6 +252,16 @@ export function fakePlay({
         listing,
       ];
       return jsonResponse(200, listing);
+    }
+    const testersTrack = /^\/testers\/(.+)$/.exec(tail)?.[1];
+    if (testersTrack !== undefined && method === 'GET') {
+      const googleGroups = snapshot.testers[testersTrack];
+      return jsonResponse(200, googleGroups === undefined ? {} : { googleGroups });
+    }
+    if (testersTrack !== undefined && method === 'PUT') {
+      const { googleGroups } = JSON.parse(String(init?.body)) as { googleGroups: string[] };
+      snapshot.testers[testersTrack] = googleGroups;
+      return jsonResponse(200, { googleGroups });
     }
     const availabilityTrack = /^\/countryAvailability\/(.+)$/.exec(tail)?.[1];
     if (availabilityTrack !== undefined && method === 'GET') {
