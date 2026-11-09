@@ -80,6 +80,18 @@ describe('MCP サーバー', () => {
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
       expect.objectContaining({
+        name: 'get_testers',
+        annotations: readOnly,
+        inputSchema: expect.objectContaining({ required: ['packageName', 'track'] }),
+      }),
+      expect.objectContaining({
+        name: 'set_testers',
+        annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
+        inputSchema: expect.objectContaining({
+          required: ['packageName', 'track', 'googleGroups'],
+        }),
+      }),
+      expect.objectContaining({
         name: 'upload_bundle',
         annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
         inputSchema: expect.objectContaining({ required: ['packageName', 'file'] }),
@@ -151,6 +163,7 @@ describe('MCP サーバー', () => {
     ]);
 
     const preparing = [
+      'set_testers',
       'upload_bundle',
       'select_build',
       'set_localizations',

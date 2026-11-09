@@ -30,6 +30,7 @@ import {
 } from './screenshots.ts';
 import { selectBuild } from './select-build.ts';
 import { localizationInput, setLocalizations } from './set-localizations.ts';
+import { getTesters, setTesters } from './testers.ts';
 import { DEFAULT_TRACK } from './tracks.ts';
 
 // 鍵は、ツールが初めて呼ばれたときに読む。鍵のファイルを置く前でもサーバーは起動し、ツールが置き場所を返す
@@ -140,6 +141,41 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   async (request) => json(await getAvailability(await getPlay(), request)),
+);
+
+server.registerTool(
+  'get_testers',
+  {
+    title: 'テスターのグループ',
+    description:
+      'テストのトラックの、テスターの Google グループを返す。Play Console で入れたメールのリストは、API では読めない。',
+    inputSchema: z.object({ ...appArguments, track: requiredTrackArgument }),
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  async (request) => json(await getTesters(await getPlay(), request)),
+);
+
+server.registerTool(
+  'set_testers',
+  {
+    title: 'テスターのグループを入れる',
+    description:
+      'テストのトラックの、テスターの Google グループを、渡したものに置き換える。メールのリストは API では変えられない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。変える前と後を返す。',
+    inputSchema: z.object({
+      ...appArguments,
+      track: requiredTrackArgument,
+      googleGroups: z
+        .array(z.email())
+        .describe('テスターの Google グループのメールアドレス。空にすると全部外す'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async (request) => json(await setTesters(await getPlay(), request)),
 );
 
 server.registerTool(
