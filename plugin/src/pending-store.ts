@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { z } from 'zod';
 
 const StoredPending = z.object({
@@ -7,7 +7,6 @@ const StoredPending = z.object({
   expiresAt: z.string().nullable(),
   changes: z.array(z.string()),
 });
-const StoredFile = z.record(z.string(), StoredPending);
 
 export type StoredPending = z.infer<typeof StoredPending>;
 
@@ -30,29 +29,27 @@ export function createMemoryStore(): PendingStore {
   };
 }
 
-// アプリごとに書き足すので、同時に動く別のセッションのアプリの記録を消さない
-export function createFileStore(path: string): PendingStore {
-  async function read(): Promise<Record<string, StoredPending>> {
-    try {
-      return StoredFile.parse(JSON.parse(await readFile(path, 'utf8')));
-    } catch {
-      return {};
-    }
-  }
+// アプリごとに別のファイルにする。同時に動くセッションや、1つのファイルの破損が、ほかのアプリの記録に及ばない
+export function createFileStore(directory: string): PendingStore {
+  const pathOf = (packageName: string) =>
+    join(directory, `${encodeURIComponent(packageName)}.json`);
   return {
     async get(packageName) {
-      return (await read())[packageName];
+      try {
+        return StoredPending.parse(JSON.parse(await readFile(pathOf(packageName), 'utf8')));
+      } catch {
+        return undefined;
+      }
     },
     async put(packageName, pending) {
-      const entries = await read();
+      const path = pathOf(packageName);
       if (pending === undefined) {
-        delete entries[packageName];
-      } else {
-        entries[packageName] = pending;
+        await rm(path, { force: true });
+        return;
       }
-      await mkdir(dirname(path), { recursive: true });
+      await mkdir(directory, { recursive: true });
       const temporary = `${path}.${process.pid}.tmp`;
-      await writeFile(temporary, JSON.stringify(entries, null, 2), { mode: 0o600 });
+      await writeFile(temporary, JSON.stringify(pending, null, 2), { mode: 0o600 });
       await rename(temporary, path);
     },
   };

@@ -46,27 +46,47 @@ export function createPlay(client: GpcClient, store: PendingStore = createMemory
 
 function createEdits(client: GpcClient, store: PendingStore): Edits {
   const pendings = new Map<string, Pending>();
+  const unsaved = new Set<string>();
   let queue: Promise<unknown> = Promise.resolve();
 
   // 新しい edit を作ると、開いている edit は無効になる（Google の文書では、アプリでなく利用者につき1つ）。
   // Claude は同時に複数のツールを呼ぶので、呼び出しをアプリをまたいで順番に行う
   function inOrder<T>(packageName: string, job: () => Promise<T>): Promise<T> {
     const run = queue.then(async () => {
-      if (!pendings.has(packageName)) {
-        const stored = await store.get(packageName);
-        if (stored !== undefined) {
-          pendings.set(packageName, stored);
-        }
-      }
+      await load(packageName);
+      const before = JSON.stringify(pendings.get(packageName));
       try {
         return await job();
       } finally {
-        // 保存できなくても、このセッションの間は続けられる
-        await store.put(packageName, pendings.get(packageName)).catch(() => undefined);
+        if (JSON.stringify(pendings.get(packageName)) !== before) {
+          await save(packageName);
+        }
       }
     });
     queue = run.catch(() => undefined);
     return run;
+  }
+
+  // 別のセッションが足した変更を見落とさないよう、毎回読み直す。保存に失敗したアプリは、メモリのほうが新しい
+  async function load(packageName: string): Promise<void> {
+    if (unsaved.has(packageName)) {
+      return;
+    }
+    const stored = await store.get(packageName);
+    if (stored === undefined) {
+      pendings.delete(packageName);
+    } else {
+      pendings.set(packageName, stored);
+    }
+  }
+
+  async function save(packageName: string): Promise<void> {
+    try {
+      await store.put(packageName, pendings.get(packageName));
+      unsaved.delete(packageName);
+    } catch {
+      unsaved.add(packageName);
+    }
   }
 
   const pathOf = (packageName: string, id: string) =>
