@@ -100,6 +100,7 @@ export function fakePlay({
   };
   const edits = new Map<string, Edit>();
   let nextEdit = 1;
+  let dataSafety: string | undefined;
   let nextImage = 1;
   const failing = new Map(Object.entries(failures));
 
@@ -130,6 +131,11 @@ export function fakePlay({
     if (method === 'GET' && /^\/tracks\/[^/]+\/releases$/.test(rest)) {
       const track = rest.split('/')[2] ?? '';
       return jsonResponse(200, { releases: lifecycle[track] ?? [] });
+    }
+    if (method === 'POST' && rest === '/dataSafety') {
+      const { safetyLabels } = JSON.parse(String(init?.body)) as { safetyLabels: string };
+      dataSafety = safetyLabels;
+      return jsonResponse(200, {});
     }
     if (method === 'POST' && rest === '/edits') {
       invalidateAll('editExpired');
@@ -300,6 +306,7 @@ export function fakePlay({
   return {
     fetch: fetchFn,
     live,
+    dataSafety: () => dataSafety,
     openEdits: () => [...edits.entries()].filter(([, edit]) => edit.invalidBecause === undefined),
     snapshotOf: (id: string) => edits.get(id)?.snapshot,
     changeInConsole: () => invalidateAll('editDeleted'),

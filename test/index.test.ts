@@ -119,6 +119,11 @@ describe('MCP サーバー', () => {
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
       expect.objectContaining({
+        name: 'set_data_safety',
+        _meta: { 'anthropic/requiresUserInteraction': true },
+        inputSchema: expect.objectContaining({ required: ['packageName', 'file'] }),
+      }),
+      expect.objectContaining({
         name: 'validate_changes',
         annotations: readOnly,
         inputSchema: expect.objectContaining({ required: ['packageName'] }),

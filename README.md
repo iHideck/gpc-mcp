@@ -17,6 +17,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `set_localizations` | Writes the store listing text and the release notes of the draft release for each language. Checks the character limits and URL formats before it writes. Creates a listing for a new language when you pass all required text. |
 | `replace_screenshots` | Replaces the images for one language and one image type with the files you pass. Handles screenshots, the app icon, the feature graphic, and the TV banner. Checks the format and size of each image before it uploads. |
 | `set_app_info` | Sets the contact email, phone, and website, and the default language. |
+| `set_data_safety` | Writes the Data safety declaration from a CSV file in the format that Play Console exports. Each call requires your confirmation. |
 | `validate_changes` | Runs the unsent changes through Google's checks. Sends nothing to Google Play. |
 | `save_draft` | Saves the unsent changes to Google Play and keeps the release as a draft. Each call requires your confirmation. |
 | `submit_for_review` | Sends the draft release of a track and the unsent changes to Google Play. A staged rollout on the production track can target specific countries. Each call requires your confirmation. |
@@ -25,7 +26,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 
 Tools that prepare a release write to *unsent changes*. Google Play receives nothing until `submit_for_review` or `save_draft` runs. Unsent changes stay across Claude Code restarts. They are lost when they expire or when someone changes the app in Play Console. They can also be lost when you work on another app, because Google documents one open edit per user. The tools report the loss.
 
-The Google Play API has no way to set the category, price, countries, or App content declarations, to publish an update held by managed publishing, or to withdraw a review. Do these in Play Console.
+The Google Play API has no way to set the category, price, countries, or the App content declarations other than Data safety, to publish an update held by managed publishing, or to withdraw a review. Do these in Play Console.
 
 ## Skill
 

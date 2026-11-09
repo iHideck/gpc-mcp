@@ -17,6 +17,7 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `set_localizations` | 言語ごとの、ストアの掲載の文と下書きのリリースのリリースノートを入れる。入れる前に、上限の文字数と URL の形を確かめる。新しい言語は、必要な文を全部渡すと作る |
 | `replace_screenshots` | 1つの言語の1つの種類の画像を、渡したファイルに入れ替える。画面写真・アイコン・フィーチャーグラフィック・TV のバナーを扱う。上げる前に、形式と大きさを確かめる |
 | `set_app_info` | 連絡先（メール・電話・ウェブサイト）と既定の言語を入れる |
+| `set_data_safety` | データセーフティの申告を、Play Console から書き出せる形の CSV で入れる。呼ぶたびに、利用者の確認が要る |
 | `validate_changes` | まだ送っていない変更を、Google の検査に通す。Google Play には何も送らない |
 | `save_draft` | まだ送っていない変更を Google Play に保存する。リリースは下書きのまま。呼ぶたびに、利用者の確認が要る |
 | `submit_for_review` | トラックの下書きのリリースと、まだ送っていない変更を Google Play に送る。製品版の段階的公開では、配る国を絞れる。呼ぶたびに、利用者の確認が要る |
@@ -25,7 +26,7 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 
 準備のツールは、「まだ送っていない変更」に入れるだけで、`submit_for_review` か `save_draft` を呼ぶまで、Google Play には何も届かない。まだ送っていない変更は、Claude Code を起動し直しても残る。有効期限が切れるか、Play Console でアプリを変えると失われる。Google の文書では開ける edit が利用者につき1つなので、別のアプリを操作しても失われることがある。失われたら、ツールが知らせる。
 
-カテゴリ・価格・配信する国・アプリのコンテンツの申告、管理対象の公開で止めた変更の公開、審査の取り下げは、Google Play の API に無い。Play Console で行う。
+カテゴリ・価格・配信する国・データセーフティ以外のアプリのコンテンツの申告、管理対象の公開で止めた変更の公開、審査の取り下げは、Google Play の API に無い。Play Console で行う。
 
 ## スキル
 
