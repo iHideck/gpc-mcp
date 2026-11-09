@@ -114,6 +114,11 @@ describe('MCP サーバー', () => {
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
       expect.objectContaining({
+        name: 'validate_changes',
+        annotations: readOnly,
+        inputSchema: expect.objectContaining({ required: ['packageName'] }),
+      }),
+      expect.objectContaining({
         name: 'save_draft',
         _meta: { 'anthropic/requiresUserInteraction': true },
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
@@ -141,6 +146,7 @@ describe('MCP サーバー', () => {
       'set_localizations',
       'replace_screenshots',
       'set_app_info',
+      'validate_changes',
       'discard_changes',
     ];
     expect(

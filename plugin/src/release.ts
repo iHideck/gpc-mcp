@@ -1,5 +1,5 @@
 import { GpcApiError } from './client.ts';
-import type { CommitOptions, Play } from './edits.ts';
+import { AppEdit, isGone, type CommitOptions, type Play } from './edits.ts';
 import { readReview, type ReviewState } from './release-status.ts';
 import {
   isDraft,
@@ -63,6 +63,34 @@ export async function saveDraft(
     const saved = [...edit.previousChanges];
     await edit.commit(flags);
     return { packageName, saved };
+  });
+}
+
+export type ValidateChangesResult = {
+  packageName: string;
+  valid: boolean | null;
+  problem: string | null;
+  changes: string[];
+};
+
+export async function validateChanges(
+  { client, edits }: Play,
+  packageName: string,
+): Promise<ValidateChangesResult> {
+  return edits.write(packageName, async (edit) => {
+    const changes = [...edit.previousChanges];
+    if (changes.length === 0) {
+      return { packageName, valid: null, problem: null, changes };
+    }
+    try {
+      await client.post(`${edit.path}:validate`, {}, undefined, AppEdit);
+      return { packageName, valid: true, problem: null, changes };
+    } catch (error) {
+      if (error instanceof GpcApiError && error.status < 500 && !isGone(error)) {
+        return { packageName, valid: false, problem: error.message, changes };
+      }
+      throw error;
+    }
   });
 }
 

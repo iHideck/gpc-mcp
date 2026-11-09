@@ -263,7 +263,7 @@ function mayHaveArrived(error: unknown): boolean {
   );
 }
 
-export function isGone(error: unknown): error is GpcApiError {
+export function isGone(error: unknown): boolean {
   return (
     error instanceof GpcApiError && error.reasons.some((reason) => GONE_REASONS.includes(reason))
   );

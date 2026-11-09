@@ -13,7 +13,13 @@ import { once } from './lazy.ts';
 import { createFileStore, type PendingStore } from './pending-store.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
-import { PHASED_RELEASE_ACTIONS, saveDraft, setPhasedRelease, submitForReview } from './release.ts';
+import {
+  PHASED_RELEASE_ACTIONS,
+  saveDraft,
+  setPhasedRelease,
+  submitForReview,
+  validateChanges,
+} from './release.ts';
 import {
   IMAGE_TYPE_NAMES,
   IMAGE_TYPES,
@@ -251,6 +257,18 @@ server.registerTool(
     },
   },
   async (request) => json(await setAppInfo(await getPlay(), request)),
+);
+
+server.registerTool(
+  'validate_changes',
+  {
+    title: 'まだ送っていない変更を確かめる',
+    description:
+      'まだ送っていない変更（pending）を、Google の検査に通す。Google Play には何も送らない。問題なければ valid が true、問題があれば valid が false で problem に理由を返す。まだ送っていない変更が無ければ valid は null。',
+    inputSchema: z.object(appArguments),
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  async ({ packageName }) => json(await validateChanges(await getPlay(), packageName)),
 );
 
 server.registerTool(
