@@ -41,6 +41,8 @@ type Options = Partial<Snapshot> & {
   autoReview?: boolean;
   // まだ公開していないアプリ
   draftApp?: boolean;
+  // 全員に出したリリースの前にも、全員に出したリリースがある（止めるのに要る）
+  hasPreviousFullRelease?: boolean;
 };
 
 type Edit = { snapshot: Snapshot; invalidBecause?: string };
@@ -88,6 +90,7 @@ export function fakePlay({
   inReview = false,
   autoReview = true,
   draftApp = false,
+  hasPreviousFullRelease = false,
   ...initial
 }: Options = {}) {
   const live: Snapshot = {
@@ -295,6 +298,18 @@ export function fakePlay({
       const statuses = releases.map(({ status }) => status);
       if (new Set(statuses).size !== statuses.length) {
         return apiError(400, 'Releases must have distinct statuses.');
+      }
+      const haltsFullRelease = releases.some(
+        ({ status, versionCodes }) =>
+          status === 'halted' &&
+          (snapshot.tracks[trackName] ?? []).some(
+            (previous) =>
+              previous.status === 'completed' &&
+              JSON.stringify(previous.versionCodes) === JSON.stringify(versionCodes),
+          ),
+      );
+      if (haltsFullRelease && !hasPreviousFullRelease) {
+        return apiError(400, 'A release can only be halted if a previous release is available.');
       }
       if (draftApp && statuses.some((status) => status !== 'draft')) {
         return apiError(403, 'Only releases with status draft may be created on draft app.');

@@ -670,8 +670,48 @@ describe('setPhasedRelease', () => {
     expect(commitSearch(fake)).toBeUndefined();
   });
 
-  it('段階的公開が無ければ、そう返す', async () => {
+  it('段階的公開が無くても、pause は全員に出したリリースを止める', async () => {
+    const { fake, play } = setup({
+      tracks: { production: [COMPLETED, DRAFT] },
+      hasPreviousFullRelease: true,
+    });
+
+    const result = await setPhasedRelease(play, { ...request, action: 'pause' });
+
+    expect(result.before.status).toBe('completed');
+    expect(result.after.status).toBe('halted');
+    expect(fake.live.tracks.production).toEqual([DRAFT, { ...COMPLETED, status: 'halted' }]);
+  });
+
+  it('全員向けの前のリリースが無ければ、Google の断りを返し、何も変えない', async () => {
+    const { fake, play } = setup({ tracks: { production: [COMPLETED] } });
+
+    await expect(setPhasedRelease(play, { ...request, action: 'pause' })).rejects.toThrow(
+      'previous release',
+    );
+
+    expect(fake.live.tracks.production).toEqual([COMPLETED]);
+    expect(fake.openEdits()).toEqual([]);
+  });
+
+  it('段階的公開があるときの pause は、全員向けのリリースを止めない', async () => {
+    const { fake, play } = withRollout();
+
+    await setPhasedRelease(play, { ...request, action: 'pause' });
+
+    expect(fake.live.tracks.production).toEqual([COMPLETED, { ...ROLLOUT, status: 'halted' }]);
+  });
+
+  it.each(['resume', 'update'] as const)('段階的公開が無ければ、%s はそう返す', async (action) => {
     const { play } = setup({ tracks: { production: [COMPLETED] } });
+
+    await expect(setPhasedRelease(play, { ...request, action, userFraction: 0.5 })).rejects.toThrow(
+      '段階的公開を進めているリリースがありません',
+    );
+  });
+
+  it('リリースが1つも無ければ、pause もそう返す', async () => {
+    const { play } = setup({ tracks: { production: [] } });
 
     await expect(setPhasedRelease(play, { ...request, action: 'pause' })).rejects.toThrow(
       '段階的公開を進めているリリースがありません',
