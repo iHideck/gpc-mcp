@@ -33,6 +33,7 @@ type Options = Partial<Snapshot> & {
   lifecycle?: Record<string, unknown[]>;
   failures?: Record<string, Response>;
   nextVersionCode?: number;
+  availability?: Record<string, unknown>;
   // 審査中の変更がある
   inReview?: boolean;
   // true なら Google が自動で審査に送る状態。false なら却下のあとなどで、手動で送る状態
@@ -82,6 +83,7 @@ export function fakePlay({
   lifecycle = {},
   failures = {},
   nextVersionCode = 100,
+  availability = {},
   inReview = false,
   autoReview = true,
   draftApp = false,
@@ -242,6 +244,10 @@ export function fakePlay({
         listing,
       ];
       return jsonResponse(200, listing);
+    }
+    const availabilityTrack = /^\/countryAvailability\/(.+)$/.exec(tail)?.[1];
+    if (availabilityTrack !== undefined && method === 'GET') {
+      return jsonResponse(200, availability[availabilityTrack] ?? {});
     }
     if (route === 'POST /bundles') {
       const bytes = init?.body as Uint8Array<ArrayBuffer>;

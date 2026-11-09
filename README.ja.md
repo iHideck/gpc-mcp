@@ -11,6 +11,7 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `list_apps` | アプリの名前とパッケージ名を返す |
 | `get_release_status` | 新しい5つのビルドと、トラックごとのリリースと、リリースごとの審査の状態を返す |
 | `get_localizations` | 言語ごとのストアの掲載情報（タイトル・簡単な説明・詳しい説明・動画の URL）と、既定の言語と、トラックのリリースノートを返す |
+| `get_availability` | トラックの配信する国を返す |
 | `upload_bundle` | App Bundle を、まだ送っていない変更に上げる。同じファイルがあれば上げ直さない |
 | `select_build` | トラックの下書きのリリースに、ビルドを選ぶ。下書きが無ければ作る |
 | `set_localizations` | 言語ごとの、ストアの掲載の文と下書きのリリースのリリースノートを入れる。入れる前に、上限の文字数と URL の形を確かめる。新しい言語は、必要な文を全部渡すと作る |
@@ -18,7 +19,7 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `set_app_info` | 連絡先（メール・電話・ウェブサイト）と既定の言語を入れる |
 | `validate_changes` | まだ送っていない変更を、Google の検査に通す。Google Play には何も送らない |
 | `save_draft` | まだ送っていない変更を Google Play に保存する。リリースは下書きのまま。呼ぶたびに、利用者の確認が要る |
-| `submit_for_review` | トラックの下書きのリリースと、まだ送っていない変更を Google Play に送る。呼ぶたびに、利用者の確認が要る |
+| `submit_for_review` | トラックの下書きのリリースと、まだ送っていない変更を Google Play に送る。製品版の段階的公開では、配る国を絞れる。呼ぶたびに、利用者の確認が要る |
 | `set_phased_release` | 段階的公開を、止める・再開する・割合を変える・全員に出す。全員に出すのは取り消せない。呼ぶたびに、利用者の確認が要る |
 | `discard_changes` | まだ Google Play に送っていない変更を捨てる |
 

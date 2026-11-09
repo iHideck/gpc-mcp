@@ -11,6 +11,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `list_apps` | Returns the name and package name of each app. |
 | `get_release_status` | Returns the five newest builds, the releases on each track, and the review state of each release. |
 | `get_localizations` | Returns the store listing text for each language (title, short description, full description, and video URL), the default language, and the release notes of a track. |
+| `get_availability` | Returns the countries where a track is available. |
 | `upload_bundle` | Uploads an Android App Bundle to the unsent changes. Does not upload a file that Google Play already has. |
 | `select_build` | Selects a build for the draft release of a track. Creates the draft release if the track has none. |
 | `set_localizations` | Writes the store listing text and the release notes of the draft release for each language. Checks the character limits and URL formats before it writes. Creates a listing for a new language when you pass all required text. |
@@ -18,7 +19,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `set_app_info` | Sets the contact email, phone, and website, and the default language. |
 | `validate_changes` | Runs the unsent changes through Google's checks. Sends nothing to Google Play. |
 | `save_draft` | Saves the unsent changes to Google Play and keeps the release as a draft. Each call requires your confirmation. |
-| `submit_for_review` | Sends the draft release of a track and the unsent changes to Google Play. Each call requires your confirmation. |
+| `submit_for_review` | Sends the draft release of a track and the unsent changes to Google Play. A staged rollout on the production track can target specific countries. Each call requires your confirmation. |
 | `set_phased_release` | Pauses, resumes, changes the percentage of, or completes a staged rollout. You cannot undo a release to all users. Each call requires your confirmation. |
 | `discard_changes` | Discards all changes that you have not sent to Google Play. |
 

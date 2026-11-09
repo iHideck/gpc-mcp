@@ -66,6 +66,7 @@ describe('getLocalizations', () => {
           versionCodes: ['2'],
           userFraction: null,
           releaseNotesLocales: ['ja-JP', 'en-US'],
+          countryTargeting: null,
         },
         notes: [
           { locale: 'ja-JP', text: '次の版' },

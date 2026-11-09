@@ -64,6 +64,7 @@ describe('getReleaseStatus', () => {
               versionCodes: ['6'],
               userFraction: 0.2,
               releaseNotesLocales: ['ja-JP'],
+              countryTargeting: null,
             },
             {
               name: '1.1.0',
@@ -71,6 +72,7 @@ describe('getReleaseStatus', () => {
               versionCodes: ['5'],
               userFraction: null,
               releaseNotesLocales: [],
+              countryTargeting: null,
             },
           ],
           review: [{ releaseName: '1.2.0', state: 'IN_REVIEW', versionCodes: [6] }],

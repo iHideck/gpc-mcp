@@ -13,6 +13,12 @@ export const Release = z.looseObject({
   versionCodes: z.array(z.string()).optional(),
   userFraction: z.number().optional(),
   releaseNotes: z.array(LocalizedText).optional(),
+  countryTargeting: z
+    .object({
+      countries: z.array(z.string()).optional(),
+      includeRestOfWorld: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type Release = z.infer<typeof Release>;
@@ -28,6 +34,7 @@ export type ReleaseView = {
   versionCodes: string[];
   userFraction: number | null;
   releaseNotesLocales: string[];
+  countryTargeting: { countries: string[]; includeRestOfWorld: boolean } | null;
 };
 
 export function viewOf(release: Release): ReleaseView {
@@ -37,6 +44,13 @@ export function viewOf(release: Release): ReleaseView {
     versionCodes: release.versionCodes ?? [],
     userFraction: release.userFraction ?? null,
     releaseNotesLocales: (release.releaseNotes ?? []).map(({ language }) => language),
+    countryTargeting:
+      release.countryTargeting === undefined
+        ? null
+        : {
+            countries: release.countryTargeting.countries ?? [],
+            includeRestOfWorld: release.countryTargeting.includeRestOfWorld ?? false,
+          },
   };
 }
 
