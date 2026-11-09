@@ -9,6 +9,7 @@ import { getAvailability } from './availability.ts';
 import { createTokenSource, loadCredentials } from './auth.ts';
 import { uploadBundle } from './bundles.ts';
 import { createClient, isReadOnly } from './client.ts';
+import { setDataSafety } from './data-safety.ts';
 import { createPlay } from './edits.ts';
 import { once } from './lazy.ts';
 import { createFileStore, type PendingStore } from './pending-store.ts';
@@ -270,6 +271,27 @@ server.registerTool(
     },
   },
   async (request) => json(await setAppInfo(await getPlay(), request)),
+);
+
+server.registerTool(
+  'set_data_safety',
+  {
+    title: 'データセーフティを入れる',
+    description:
+      'データセーフティの申告を、CSV で入れる。CSV は Play Console のデータセーフティの画面から書き出せる形にする。まだ送っていない変更には入らず、呼ぶとすぐ Google Play に届く。申告を上書きする。呼ぶたびに、利用者の確認が要る。',
+    inputSchema: z.object({
+      ...appArguments,
+      file: z.string().min(1).describe('CSV のファイルの絶対パス'),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    _meta: NEEDS_APPROVAL,
+  },
+  async (request) => json(await setDataSafety(await getPlay(), request)),
 );
 
 server.registerTool(
