@@ -1,7 +1,14 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createClient, UnknownOutcomeError } from '../plugin/src/client.ts';
 import { createPlay } from '../plugin/src/edits.ts';
-import { createMemoryStore, type PendingStore } from '../plugin/src/pending-store.ts';
+import {
+  createFileStore,
+  createMemoryStore,
+  type PendingStore,
+} from '../plugin/src/pending-store.ts';
 import { listTracks, readTrack, writeTrack } from '../plugin/src/tracks.ts';
 import { apiError, fakePlay, type FakeRelease } from './fake-play.ts';
 
@@ -307,6 +314,44 @@ describe('まだ送っていない edit', () => {
     await play.edits.discard(PACKAGE);
 
     expect(await store.get(PACKAGE)).toBeUndefined();
+  });
+
+  it('別のセッションが足した変更の記録を、古い記録で上書きしない', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const store = createFileStore(join(await mkdtemp(join(tmpdir(), 'gpc-mcp-')), 'pending'));
+    const client = createClient(async () => 'TOKEN', fake.fetch);
+    const first = createPlay(client, store);
+    const second = createPlay(client, store);
+    await addDraft(first, '1つ目');
+    await addDraft(second, '2つ目');
+
+    await statuses(first);
+
+    expect(first.edits.pending(PACKAGE)?.changes).toEqual(['1つ目', '2つ目']);
+    expect((await store.get(PACKAGE))?.changes).toEqual(['1つ目', '2つ目']);
+  });
+
+  it('読むだけなら、記録を書き込まない', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const memory = createMemoryStore();
+    let puts = 0;
+    const store: PendingStore = {
+      get: memory.get,
+      put: async (packageName, pending) => {
+        puts += 1;
+        await memory.put(packageName, pending);
+      },
+    };
+    const play = createPlay(
+      createClient(async () => 'TOKEN', fake.fetch),
+      store,
+    );
+    await addDraft(play);
+    const afterWrite = puts;
+
+    await statuses(play);
+
+    expect(puts).toBe(afterWrite);
   });
 
   it('記録を保存できなくても、そのセッションの間は続けられる', async () => {

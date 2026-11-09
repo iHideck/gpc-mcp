@@ -49,7 +49,7 @@ const getPlay = once(async () =>
 function pendingStore(dataDirectory: string | undefined): PendingStore | undefined {
   return dataDirectory === undefined
     ? undefined
-    : createFileStore(join(dataDirectory, 'pending-edits.json'));
+    : createFileStore(join(dataDirectory, 'pending-edits'));
 }
 
 function json(value: unknown) {
