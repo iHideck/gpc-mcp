@@ -1,8 +1,9 @@
-import type { PendingSummary, Play } from './edits.ts';
+import type { PendingSummary, Play, WritableEdit } from './edits.ts';
 import { AppDetails } from './localizations.ts';
 
 const FIELDS = ['defaultLanguage', 'contactEmail', 'contactPhone', 'contactWebsite'] as const;
 type Field = (typeof FIELDS)[number];
+const CONTACT_FIELDS = ['contactEmail', 'contactPhone', 'contactWebsite'] as const;
 
 export type SetAppInfoRequest = {
   packageName: string;
@@ -10,6 +11,7 @@ export type SetAppInfoRequest = {
   contactEmail?: string | undefined;
   contactPhone?: string | null | undefined;
   contactWebsite?: string | null | undefined;
+  sameAsApp?: string | undefined;
 };
 
 type AppInfo = Record<Field, string | null>;
@@ -18,6 +20,7 @@ export type SetAppInfoResult = {
   packageName: string;
   before: AppInfo;
   after: AppInfo;
+  missingInSource: string[];
   pending: PendingSummary | null;
 };
 
@@ -25,14 +28,28 @@ export async function setAppInfo(
   { client, edits }: Play,
   request: SetAppInfoRequest,
 ): Promise<SetAppInfoResult> {
-  const { packageName } = request;
+  const { packageName, sameAsApp } = request;
   checkWebsite(request.contactWebsite);
-  return edits.write(packageName, async (edit) => {
+  if (sameAsApp === packageName) {
+    throw new Error('sameAsApp には、別のアプリのパッケージ名を渡してください。');
+  }
+
+  async function apply(edit: WritableEdit, source: AppDetails | undefined) {
+    const wanted = { ...request };
+    for (const field of CONTACT_FIELDS) {
+      if (wanted[field] === undefined) {
+        wanted[field] = source?.[field];
+      }
+    }
+    const missingInSource = CONTACT_FIELDS.filter(
+      (field) =>
+        source !== undefined && request[field] === undefined && source[field] === undefined,
+    );
     const path = `${edit.path}/details`;
     const current = await client.get(path, {}, AppDetails);
     const next: AppDetails = { ...current };
     for (const field of FIELDS) {
-      const value = request[field];
+      const value = wanted[field];
       if (value === undefined) {
         continue;
       }
@@ -43,24 +60,29 @@ export async function setAppInfo(
       }
     }
     const changed = FIELDS.filter((field) => (next[field] ?? null) !== (current[field] ?? null));
-    if (changed.length === 0) {
-      return {
-        packageName,
-        before: infoOf(current),
-        after: infoOf(current),
-        pending: edits.pending(packageName),
-      };
-    }
-    const stored = await edit.change(`App の情報（${changed.join('・')}）を変えた`, () =>
-      client.put(path, next, AppDetails),
-    );
+    const stored =
+      changed.length === 0
+        ? current
+        : await edit.change(`App の情報（${changed.join('・')}）を変えた`, () =>
+            client.put(path, next, AppDetails),
+          );
     return {
       packageName,
       before: infoOf(current),
       after: infoOf(stored),
+      missingInSource,
       pending: edits.pending(packageName),
     };
-  });
+  }
+
+  return sameAsApp === undefined
+    ? edits.write(packageName, (edit) => apply(edit, undefined))
+    : edits.writeFromOtherApp(
+        packageName,
+        sameAsApp,
+        (edit) => client.get(`${edit.path}/details`, {}, AppDetails),
+        apply,
+      );
 }
 
 function infoOf(details: AppDetails): AppInfo {

@@ -36,6 +36,12 @@ export type Edits = {
   write<T>(packageName: string, work: (edit: WritableEdit) => Promise<T>): Promise<T>;
   discard(packageName: string): Promise<PendingSummary | null>;
   pending(packageName: string): PendingSummary | null;
+  writeFromOtherApp<S, T>(
+    packageName: string,
+    otherPackage: string,
+    read: (edit: ReadableEdit) => Promise<S>,
+    work: (edit: WritableEdit, value: S) => Promise<T>,
+  ): Promise<T>;
 };
 
 export type Play = { client: GpcClient; edits: Edits };
@@ -145,78 +151,103 @@ function createEdits(client: GpcClient, store: PendingStore): Edits {
     }
   }
 
+  async function readApp<T>(
+    packageName: string,
+    work: (edit: ReadableEdit) => Promise<T>,
+  ): Promise<T> {
+    const pending = await currentPending(packageName);
+    if (pending !== undefined) {
+      return guarded(packageName, pending, () => work({ path: pathOf(packageName, pending.id) }));
+    }
+    const temporary = await open(packageName);
+    try {
+      return await work({ path: pathOf(packageName, temporary.id) });
+    } finally {
+      await close(packageName, temporary.id);
+    }
+  }
+
+  async function writeApp<T>(
+    packageName: string,
+    work: (edit: WritableEdit) => Promise<T>,
+  ): Promise<T> {
+    const pending = (await currentPending(packageName)) ?? (await open(packageName));
+    pendings.set(packageName, pending);
+    const path = pathOf(packageName, pending.id);
+    const previousChanges = [...pending.changes];
+    try {
+      return await guarded(packageName, pending, () =>
+        work({
+          path,
+          previousChanges,
+          async change(description, step) {
+            const uncertain = uncertainOf(description);
+            const others = () =>
+              pending.changes.filter((text) => text !== description && text !== uncertain);
+            try {
+              const result = await step();
+              pending.changes = [...others(), description];
+              return result;
+            } catch (error) {
+              // 記録しないと、捨てる変更の一覧から漏れ、何も変えていない edit として消してしまう
+              if (mayHaveArrived(error) && !pending.changes.includes(description)) {
+                pending.changes = [...others(), uncertain];
+              }
+              throw error;
+            }
+          },
+          finishChange(unfinished, finished) {
+            const stale = [unfinished, uncertainOf(unfinished)];
+            if (pending.changes.some((text) => stale.includes(text))) {
+              pending.changes = [
+                ...pending.changes.filter((text) => !stale.includes(text) && text !== finished),
+                finished,
+              ];
+            }
+          },
+          async commit(options = {}) {
+            await commit(client, path, options);
+            pendings.delete(packageName);
+          },
+          async abandon() {
+            pendings.delete(packageName);
+            await close(packageName, pending.id);
+            return [...pending.changes];
+          },
+        }),
+      );
+    } finally {
+      // 何も変えなかった edit を残すと、まだ送っていない変更があるように見える
+      if (pending.changes.length === 0 && pendings.has(packageName)) {
+        pendings.delete(packageName);
+        await close(packageName, pending.id);
+      }
+    }
+  }
+
   return {
     read(packageName, work) {
-      return inOrder(packageName, async () => {
-        const pending = await currentPending(packageName);
-        if (pending !== undefined) {
-          return guarded(packageName, pending, () =>
-            work({ path: pathOf(packageName, pending.id) }),
-          );
-        }
-        const temporary = await open(packageName);
-        try {
-          return await work({ path: pathOf(packageName, temporary.id) });
-        } finally {
-          await close(packageName, temporary.id);
-        }
-      });
+      return inOrder(packageName, () => readApp(packageName, work));
     },
 
     write(packageName, work) {
+      return inOrder(packageName, () => writeApp(packageName, work));
+    },
+
+    // 確かめて読んで書くまでを1回の順番で行う。あいだに別のツールが変更を足すと、別のアプリの edit で失われる
+    writeFromOtherApp(packageName, otherPackage, read, work) {
       return inOrder(packageName, async () => {
-        const pending = (await currentPending(packageName)) ?? (await open(packageName));
-        pendings.set(packageName, pending);
-        const path = pathOf(packageName, pending.id);
-        const previousChanges = [...pending.changes];
-        try {
-          return await guarded(packageName, pending, () =>
-            work({
-              path,
-              previousChanges,
-              async change(description, step) {
-                const uncertain = uncertainOf(description);
-                const others = () =>
-                  pending.changes.filter((text) => text !== description && text !== uncertain);
-                try {
-                  const result = await step();
-                  pending.changes = [...others(), description];
-                  return result;
-                } catch (error) {
-                  // 記録しないと、捨てる変更の一覧から漏れ、何も変えていない edit として消してしまう
-                  if (mayHaveArrived(error) && !pending.changes.includes(description)) {
-                    pending.changes = [...others(), uncertain];
-                  }
-                  throw error;
-                }
-              },
-              finishChange(unfinished, finished) {
-                const stale = [unfinished, uncertainOf(unfinished)];
-                if (pending.changes.some((text) => stale.includes(text))) {
-                  pending.changes = [
-                    ...pending.changes.filter((text) => !stale.includes(text) && text !== finished),
-                    finished,
-                  ];
-                }
-              },
-              async commit(options = {}) {
-                await commit(client, path, options);
-                pendings.delete(packageName);
-              },
-              async abandon() {
-                pendings.delete(packageName);
-                await close(packageName, pending.id);
-                return [...pending.changes];
-              },
-            }),
+        await load(otherPackage);
+        const busy = [packageName, otherPackage].filter(
+          (name) => (pendings.get(name)?.changes.length ?? 0) > 0,
+        );
+        if (busy.length > 0) {
+          throw new Error(
+            `${busy.join('・')} にまだ送っていない変更があるので、別のアプリから写せません（別のアプリの edit を作ると、変更が無効になることがあります）。先に送るか、discard_changes で捨ててください。`,
           );
-        } finally {
-          // 何も変えなかった edit を残すと、まだ送っていない変更があるように見える
-          if (pending.changes.length === 0 && pendings.has(packageName)) {
-            pendings.delete(packageName);
-            await close(packageName, pending.id);
-          }
         }
+        const value = await readApp(otherPackage, read);
+        return writeApp(packageName, (edit) => work(edit, value));
       });
     },
 

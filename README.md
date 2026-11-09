@@ -19,7 +19,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `select_build` | Selects a build for the draft release of a track. Creates the draft release if the track has none. |
 | `set_localizations` | Writes the store listing text and the release notes of the draft release for each language. Checks the character limits and URL formats before it writes. Creates a listing for a new language when you pass all required text. |
 | `replace_screenshots` | Replaces the images for one language and one image type with the files you pass. Handles screenshots, the app icon, the feature graphic, and the TV banner. Checks the format and size of each image before it uploads. |
-| `set_app_info` | Sets the contact email, phone, and website, and the default language. |
+| `set_app_info` | Sets the contact email, phone, and website, and the default language. Can copy the contact details from another app. |
 | `set_data_safety` | Writes the Data safety declaration from a CSV file in the format that Play Console exports. Each call requires your confirmation. |
 | `validate_changes` | Runs the unsent changes through Google's checks. Sends nothing to Google Play. |
 | `save_draft` | Saves the unsent changes to Google Play and keeps the release as a draft. Each call requires your confirmation. |
