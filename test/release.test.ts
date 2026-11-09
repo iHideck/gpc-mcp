@@ -169,6 +169,14 @@ describe('validateChanges', () => {
     await expect(validateChanges(play, PACKAGE)).rejects.toThrow('無効になりました');
   });
 
+  it.each([401, 403, 429])('%d は、断られた扱いにしない', async (status) => {
+    const { play } = setup({ failures: { [VALIDATE]: apiError(status, 'not a verdict') } });
+    await changeEmail({ play });
+
+    await expect(validateChanges(play, PACKAGE)).rejects.toThrow(String(status));
+    expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
+  });
+
   it('5xx は、断られた扱いにしない', async () => {
     const { play } = setup({ failures: { [VALIDATE]: apiError(503, 'unavailable') } });
     await changeEmail({ play });

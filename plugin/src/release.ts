@@ -88,12 +88,22 @@ export async function validateChanges(
       await client.post(`${edit.path}:validate`, {}, undefined, AppEdit);
       return { packageName, valid: true, problem: null, changes };
     } catch (error) {
-      if (error instanceof GpcApiError && error.status < 500 && !isGone(error)) {
+      if (error instanceof GpcApiError && isVerdict(error)) {
         return { packageName, valid: false, problem: error.message, changes };
       }
       throw error;
     }
   });
+}
+
+// 鍵・権限・呼び出しの上限の失敗は、変更の中身の問題ではない
+function isVerdict(error: GpcApiError): boolean {
+  return (
+    error.status >= 400 &&
+    error.status < 500 &&
+    ![401, 403, 429].includes(error.status) &&
+    !isGone(error)
+  );
 }
 
 export async function submitForReview(
