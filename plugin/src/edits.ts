@@ -6,6 +6,7 @@ import {
   type GpcClient,
   type Params,
 } from './client.ts';
+import { createMemoryStore, type PendingStore } from './pending-store.ts';
 
 export const AppEdit = z.object({ id: z.string(), expiryTimeSeconds: z.string().optional() });
 
@@ -39,18 +40,31 @@ export type Edits = {
 
 export type Play = { client: GpcClient; edits: Edits };
 
-export function createPlay(client: GpcClient): Play {
-  return { client, edits: createEdits(client) };
+export function createPlay(client: GpcClient, store: PendingStore = createMemoryStore()): Play {
+  return { client, edits: createEdits(client, store) };
 }
 
-function createEdits(client: GpcClient): Edits {
+function createEdits(client: GpcClient, store: PendingStore): Edits {
   const pendings = new Map<string, Pending>();
   let queue: Promise<unknown> = Promise.resolve();
 
   // 新しい edit を作ると、開いている edit は無効になる（Google の文書では、アプリでなく利用者につき1つ）。
   // Claude は同時に複数のツールを呼ぶので、呼び出しをアプリをまたいで順番に行う
-  function inOrder<T>(job: () => Promise<T>): Promise<T> {
-    const run = queue.then(job);
+  function inOrder<T>(packageName: string, job: () => Promise<T>): Promise<T> {
+    const run = queue.then(async () => {
+      if (!pendings.has(packageName)) {
+        const stored = await store.get(packageName);
+        if (stored !== undefined) {
+          pendings.set(packageName, stored);
+        }
+      }
+      try {
+        return await job();
+      } finally {
+        // 保存できなくても、このセッションの間は続けられる
+        await store.put(packageName, pendings.get(packageName)).catch(() => undefined);
+      }
+    });
     queue = run.catch(() => undefined);
     return run;
   }
@@ -113,7 +127,7 @@ function createEdits(client: GpcClient): Edits {
 
   return {
     read(packageName, work) {
-      return inOrder(async () => {
+      return inOrder(packageName, async () => {
         const pending = await currentPending(packageName);
         if (pending !== undefined) {
           return guarded(packageName, pending, () =>
@@ -130,7 +144,7 @@ function createEdits(client: GpcClient): Edits {
     },
 
     write(packageName, work) {
-      return inOrder(async () => {
+      return inOrder(packageName, async () => {
         const pending = (await currentPending(packageName)) ?? (await open(packageName));
         pendings.set(packageName, pending);
         const path = pathOf(packageName, pending.id);
@@ -187,7 +201,7 @@ function createEdits(client: GpcClient): Edits {
     },
 
     discard(packageName) {
-      return inOrder(async () => {
+      return inOrder(packageName, async () => {
         const pending = pendings.get(packageName);
         if (pending === undefined) {
           return null;

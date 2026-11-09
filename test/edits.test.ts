@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createClient, UnknownOutcomeError } from '../plugin/src/client.ts';
 import { createPlay } from '../plugin/src/edits.ts';
+import { createMemoryStore, type PendingStore } from '../plugin/src/pending-store.ts';
 import { listTracks, readTrack, writeTrack } from '../plugin/src/tracks.ts';
 import { apiError, fakePlay, type FakeRelease } from './fake-play.ts';
 
@@ -264,6 +265,66 @@ describe('まだ送っていない edit', () => {
     ]);
 
     expect(written).toEqual([COMPLETED, DRAFT]);
+  });
+
+  it('サーバーを起動し直しても、まだ送っていない変更を続けられる', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const store = createMemoryStore();
+    const client = createClient(async () => 'TOKEN', fake.fetch);
+    await addDraft(createPlay(client, store));
+
+    const restarted = createPlay(client, store);
+
+    expect(await statuses(restarted)).toEqual(['completed', 'draft']);
+    expect(restarted.edits.pending(PACKAGE)?.changes).toEqual(['下書きを足した']);
+    expect(fake.requests().filter((request) => request.endsWith('/edits'))).toHaveLength(1);
+  });
+
+  it('起動し直したあとに edit が無効なら、失われた変更を知らせて、記録も消す', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const store = createMemoryStore();
+    const client = createClient(async () => 'TOKEN', fake.fetch);
+    await addDraft(createPlay(client, store));
+    fake.changeInConsole();
+
+    const restarted = createPlay(client, store);
+
+    await expect(statuses(restarted)).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
+    expect(await store.get(PACKAGE)).toBeUndefined();
+    expect(await statuses(restarted)).toEqual(['completed']);
+  });
+
+  it('送ったり捨てたりしたら、記録も消す', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const store = createMemoryStore();
+    const play = createPlay(
+      createClient(async () => 'TOKEN', fake.fetch),
+      store,
+    );
+    await addDraft(play);
+    expect(await store.get(PACKAGE)).toMatchObject({ changes: ['下書きを足した'] });
+
+    await play.edits.discard(PACKAGE);
+
+    expect(await store.get(PACKAGE)).toBeUndefined();
+  });
+
+  it('記録を保存できなくても、そのセッションの間は続けられる', async () => {
+    const fake = fakePlay({ tracks: { production: [COMPLETED] } });
+    const store: PendingStore = {
+      get: async () => undefined,
+      put: async () => {
+        throw new Error('disk full');
+      },
+    };
+    const play = createPlay(
+      createClient(async () => 'TOKEN', fake.fetch),
+      store,
+    );
+
+    await addDraft(play);
+
+    expect(await statuses(play)).toEqual(['completed', 'draft']);
   });
 
   it('捨てると、edit を消し、捨てた変更を返す。何も無ければ null を返す', async () => {

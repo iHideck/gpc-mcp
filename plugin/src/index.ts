@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
@@ -9,6 +10,7 @@ import { uploadBundle } from './bundles.ts';
 import { createClient, isReadOnly } from './client.ts';
 import { createPlay } from './edits.ts';
 import { once } from './lazy.ts';
+import { createFileStore, type PendingStore } from './pending-store.ts';
 import { getLocalizations } from './localizations.ts';
 import { getReleaseStatus } from './release-status.ts';
 import { PHASED_RELEASE_ACTIONS, saveDraft, setPhasedRelease, submitForReview } from './release.ts';
@@ -30,8 +32,16 @@ const getPlay = once(async () =>
       fetch,
       isReadOnly(process.env.GPC_READ_ONLY),
     ),
+    pendingStore(process.env.CLAUDE_PLUGIN_DATA),
   ),
 );
+
+// プラグインの外（make run-claude）には保存の場所が無いので、そのセッションの間だけ覚える
+function pendingStore(dataDirectory: string | undefined): PendingStore | undefined {
+  return dataDirectory === undefined
+    ? undefined
+    : createFileStore(join(dataDirectory, 'pending-edits.json'));
+}
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
