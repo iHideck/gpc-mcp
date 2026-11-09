@@ -23,6 +23,8 @@ export type SubmitForReviewRequest = {
   packageName: string;
   track: string;
   userFraction?: number | undefined;
+  countries?: string[] | undefined;
+  includeRestOfWorld?: boolean | undefined;
 } & CommitOptions;
 
 export type SubmitForReviewResult = {
@@ -98,7 +100,16 @@ export async function submitForReview(
   { client, edits }: Play,
   request: SubmitForReviewRequest,
 ): Promise<SubmitForReviewResult> {
-  const { packageName, track, userFraction, cancelChangesInReview, notSentForReview } = request;
+  const {
+    packageName,
+    track,
+    userFraction,
+    countries,
+    includeRestOfWorld,
+    cancelChangesInReview,
+    notSentForReview,
+  } = request;
+  checkCountries(request);
   return edits.write(packageName, async (edit) => {
     const flags = { cancelChangesInReview, notSentForReview };
     const target = await readTrack(client, edit, track);
@@ -138,6 +149,9 @@ export async function submitForReview(
       ...draft,
       status: userFraction === undefined ? 'completed' : 'inProgress',
       ...(userFraction === undefined ? {} : { userFraction }),
+      ...(countries === undefined
+        ? {}
+        : { countryTargeting: { countries, includeRestOfWorld: includeRestOfWorld ?? false } }),
     };
     const others = target.releases.filter((release) => release !== draft);
     // 全員に出すなら、前のリリースはすべて置き換わる。段階的公開なら、全員向けのリリースは残す
@@ -183,6 +197,23 @@ export async function submitForReview(
       warnings,
     );
   });
+}
+
+// Google の仕様では、国を絞れるのは製品版の段階的公開だけ
+function checkCountries({
+  track,
+  userFraction,
+  countries,
+  includeRestOfWorld,
+}: SubmitForReviewRequest): void {
+  if (includeRestOfWorld !== undefined && countries === undefined) {
+    throw new Error('includeRestOfWorld は、countries と一緒に渡してください。');
+  }
+  if (countries !== undefined && (userFraction === undefined || !/(^|:)production$/.test(track))) {
+    throw new Error(
+      '国を絞れるのは、製品版のトラックの段階的公開（userFraction を渡すとき）だけです。',
+    );
+  }
 }
 
 function withDraftAppHint(error: GpcApiError): GpcApiError {

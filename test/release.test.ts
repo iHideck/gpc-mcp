@@ -348,6 +348,57 @@ describe('submitForReview', () => {
     ]);
   });
 
+  it('製品版の段階的公開では、配る国を絞れる', async () => {
+    const { fake, play } = setup();
+
+    const result = await submitForReview(play, {
+      ...submit,
+      userFraction: 0.2,
+      countries: ['JP', 'US'],
+      includeRestOfWorld: true,
+    });
+
+    expect(result.release?.after.countryTargeting).toEqual({
+      countries: ['JP', 'US'],
+      includeRestOfWorld: true,
+    });
+    expect(fake.live.tracks.production?.[1]?.countryTargeting).toEqual({
+      countries: ['JP', 'US'],
+      includeRestOfWorld: true,
+    });
+  });
+
+  it('その他の国に配るかを省くと、配らない', async () => {
+    const { fake, play } = setup();
+
+    await submitForReview(play, { ...submit, userFraction: 0.2, countries: ['JP'] });
+
+    expect(fake.live.tracks.production?.[1]?.countryTargeting).toEqual({
+      countries: ['JP'],
+      includeRestOfWorld: false,
+    });
+  });
+
+  it.each([
+    ['段階的公開でない', { ...submit, countries: ['JP'] }, '段階的公開'],
+    [
+      '製品版でない',
+      { ...submit, track: 'alpha', userFraction: 0.2, countries: ['JP'] },
+      '製品版のトラック',
+    ],
+    [
+      'countries が無いのに includeRestOfWorld を渡す',
+      { ...submit, userFraction: 0.2, includeRestOfWorld: true },
+      'countries と一緒に',
+    ],
+  ])('%sときは、何も送らずに断る', async (_, request, message) => {
+    const { fake, play } = setup();
+
+    await expect(submitForReview(play, request)).rejects.toThrow(message);
+
+    expect(fake.requests()).toEqual([]);
+  });
+
   it('進めている段階的公開を置き換えるときは、知らせる', async () => {
     const rollout: FakeRelease = {
       name: '1.0.1',

@@ -75,6 +75,11 @@ describe('MCP サーバー', () => {
         }),
       }),
       expect.objectContaining({
+        name: 'get_availability',
+        annotations: readOnly,
+        inputSchema: expect.objectContaining({ required: ['packageName'] }),
+      }),
+      expect.objectContaining({
         name: 'upload_bundle',
         annotations: expect.objectContaining({ readOnlyHint: false, idempotentHint: true }),
         inputSchema: expect.objectContaining({ required: ['packageName', 'file'] }),

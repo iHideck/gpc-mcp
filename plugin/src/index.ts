@@ -5,6 +5,7 @@ import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
 import { setAppInfo } from './app-info.ts';
 import { listApps } from './apps.ts';
+import { getAvailability } from './availability.ts';
 import { createTokenSource, loadCredentials } from './auth.ts';
 import { uploadBundle } from './bundles.ts';
 import { createClient, isReadOnly } from './client.ts';
@@ -126,6 +127,18 @@ server.registerTool(
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   async (request) => json(await getLocalizations(await getPlay(), request)),
+);
+
+server.registerTool(
+  'get_availability',
+  {
+    title: '配信する国',
+    description:
+      'トラックの配信する国（2文字の国コード）と、その他の国に配信するか（restOfWorld）、製品版と同じ設定か（syncWithProduction）を返す。配信する国は API では変えられないので、変えるときは Play Console で行う。',
+    inputSchema: z.object({ ...appArguments, track: trackArgument }),
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  async (request) => json(await getAvailability(await getPlay(), request)),
 );
 
 server.registerTool(
@@ -305,6 +318,15 @@ server.registerTool(
       userFraction: userFractionArgument
         .optional()
         .describe('段階的公開で配る割合（0 より大きく 1 より小さい。例: 0.2）'),
+      countries: z
+        .array(z.string().regex(/^[A-Z]{2}$/, '国は JP・US のような2文字のコードです'))
+        .min(1)
+        .optional()
+        .describe('段階的公開を配る国（例: ["JP", "US"]）。製品版の段階的公開だけで使える'),
+      includeRestOfWorld: z
+        .boolean()
+        .optional()
+        .describe('countries のほかの国にも配るか。省くと配らない'),
       cancelChangesInReview: cancelChangesInReviewArgument,
       notSentForReview: notSentForReviewArgument,
     }),
