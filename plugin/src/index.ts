@@ -308,7 +308,7 @@ server.registerTool(
   {
     title: 'App の情報を入れる',
     description:
-      'ストアに出す連絡先（メール・電話・ウェブサイト）と、既定の言語を入れる。渡した項目だけを変える。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。カテゴリ・コンテンツのレーティング・データセーフティは API に無いので、Play Console で入れる。変える前と後を返す。',
+      'ストアに出す連絡先（メール・電話・ウェブサイト）と、既定の言語を入れる。渡した項目だけを変える。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。sameAsApp を渡すと、ほかのアプリから連絡先を写す。カテゴリ・コンテンツのレーティングは API に無いので、Play Console で入れる。変える前と後と、写す元に無かった項目（missingInSource）を返す。',
     inputSchema: z.object({
       ...appArguments,
       defaultLanguage: z.string().min(1).optional().describe('既定の言語（例: ja-JP）'),
@@ -323,6 +323,13 @@ server.registerTool(
         .nullable()
         .optional()
         .describe('ストアに出すウェブサイト。null か空の文字にすると消す。省くと変えない'),
+      sameAsApp: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          '連絡先（メール・電話・ウェブサイト）を写す元のアプリのパッケージ名。渡した項目は、写す元より優先する。まだ送っていない変更があるときは使えない',
+        ),
     }),
     annotations: {
       readOnlyHint: false,
