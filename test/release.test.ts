@@ -615,6 +615,29 @@ describe('setPhasedRelease', () => {
     ]);
   });
 
+  it('国を絞った段階的公開を全員に出すと、国の指定を外す', async () => {
+    const targeted: FakeRelease = {
+      ...ROLLOUT,
+      countryTargeting: { countries: ['JP'], includeRestOfWorld: false },
+    };
+    const { fake, play } = setup({ tracks: { production: [targeted] } });
+
+    await setPhasedRelease(play, { ...request, action: 'complete' });
+
+    expect(fake.live.tracks.production).toEqual([
+      { name: '1.1.0', status: 'completed', versionCodes: ['2'] },
+    ]);
+  });
+
+  it('国を絞った段階的公開を止めても、再開したときに広がらないよう、国の指定を残す', async () => {
+    const countryTargeting = { countries: ['JP'], includeRestOfWorld: false };
+    const { fake, play } = setup({ tracks: { production: [{ ...ROLLOUT, countryTargeting }] } });
+
+    await setPhasedRelease(play, { ...request, action: 'pause' });
+
+    expect(fake.live.tracks.production?.[0]?.countryTargeting).toEqual(countryTargeting);
+  });
+
   it('下書きのリリースは、全員に出しても残す', async () => {
     const { fake, play } = setup({ tracks: { production: [COMPLETED, ROLLOUT, DRAFT] } });
 
