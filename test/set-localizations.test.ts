@@ -58,7 +58,7 @@ describe('setLocalizations', () => {
       { locale: 'ja-JP', field: 'title', before: 'アプリ', after: '新しい名前' },
     ]);
     expect(result.warnings).toEqual([]);
-    expect(result.pending?.changes).toEqual(['ja-JP のタイトルを変えた']);
+    expect(result.pending?.changes).toEqual(['Changed the ja-JP title']);
     expect(snapshot(fake)?.listings).toContainEqual({ ...JA, title: '新しい名前' });
     expect(fake.live.listings).toEqual([JA, EN]);
   });
@@ -116,11 +116,11 @@ describe('setLocalizations', () => {
       ),
     ).rejects.toThrow(
       [
-        '- ja-JP のタイトル: 31 文字（30 文字まで）',
-        '- ja-JP の簡単な説明: 81 文字（80 文字まで）',
-        '- ja-JP の詳しい説明: 4001 文字（4000 文字まで）',
-        '- ja-JP の動画の URL: http か https の URL ではありません',
-        '- ja-JP のリリースノート: 501 文字（500 文字まで）',
+        '- ja-JP title: 31 characters (limit 30)',
+        '- ja-JP short description: 81 characters (limit 80)',
+        '- ja-JP full description: 4001 characters (limit 4000)',
+        '- ja-JP video URL: not an http or https URL',
+        '- ja-JP release notes: 501 characters (limit 500)',
       ].join('\n'),
     );
 
@@ -138,7 +138,7 @@ describe('setLocalizations', () => {
           { locale: 'ja-JP', title: 'B' },
         ]),
       ),
-    ).rejects.toThrow('言語 ja-JP が2回以上あります');
+    ).rejects.toThrow('ja-JP appears more than once');
   });
 
   it('無い言語は、必要な文を全部渡すと新しく作り、知らせる', async () => {
@@ -156,7 +156,7 @@ describe('setLocalizations', () => {
       'shortDescription',
       'fullDescription',
     ]);
-    expect(result.warnings).toEqual(['言語 ko-KR の掲載情報を新しく作りました。']);
+    expect(result.warnings).toEqual(['Created a new store listing for ko-KR.']);
     expect(snapshot(fake)?.listings).toContainEqual({
       language: 'ko-KR',
       title: '앱',
@@ -176,7 +176,9 @@ describe('setLocalizations', () => {
           { locale: 'ko-KR', title: '앱' },
         ]),
       ),
-    ).rejects.toThrow(/簡単な説明・詳しい説明も要ります。ある言語は ja-JP、en-US です/);
+    ).rejects.toThrow(
+      /also pass the short description, full description\. Existing languages: ja-JP, en-US/,
+    );
 
     expect(fake.openEdits()).toEqual([]);
   });
@@ -192,7 +194,7 @@ describe('setLocalizations', () => {
     expect(result.changes).toEqual([
       { locale: 'ja-JP', field: 'releaseNotes', before: null, after: '直した' },
     ]);
-    expect(result.pending?.changes).toEqual(['ja-JP のリリースノートを変えた']);
+    expect(result.pending?.changes).toEqual(['Changed the ja-JP release notes']);
     expect(snapshot(fake)?.tracks.production).toEqual([
       COMPLETED,
       {
@@ -234,7 +236,7 @@ describe('setLocalizations', () => {
         play,
         request([{ locale: 'ja-JP', title: '変える', releaseNotes: '直した' }]),
       ),
-    ).rejects.toThrow('select_build でビルドを選んでから');
+    ).rejects.toThrow('Select a build with select_build');
 
     expect(fake.openEdits()).toEqual([]);
   });
@@ -254,14 +256,14 @@ describe('setLocalizations', () => {
     ]);
 
     await expect(setLocalizations(play, both)).rejects.toThrow(
-      /ja-JP のタイトルを変えました。en-US のタイトルを変えるところで止まりました/,
+      /Changed the ja-JP title\. Stopped while changing the en-US title/,
     );
     const retried = await setLocalizations(play, both);
 
     expect(retried.changes.map(({ locale }) => locale)).toEqual(['en-US']);
     expect(retried.pending?.changes).toEqual([
-      'ja-JP のタイトルを変えた',
-      'en-US のタイトルを変えた',
+      'Changed the ja-JP title',
+      'Changed the en-US title',
     ]);
     expect(fake.openEdits()).toHaveLength(1);
   });
@@ -280,7 +282,7 @@ describe('setLocalizations', () => {
     const result = await setLocalizations(play, request([{ locale: 'ja-JP', title: '名前' }]));
 
     expect(result.warnings).toEqual([
-      'Google Play の値が、頼んだものと違います: ja-JP のタイトル（Google が直したかもしれません。get_localizations で確かめてください）',
+      'The value in Google Play differs from the one you passed: ja-JP title. Google may have corrected it. Check it with get_localizations.',
     ]);
   });
 });

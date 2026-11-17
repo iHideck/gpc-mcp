@@ -31,7 +31,7 @@ export async function setAppInfo(
   const { packageName, sameAsApp } = request;
   checkWebsite(request.contactWebsite);
   if (sameAsApp === packageName) {
-    throw new Error('sameAsApp には、別のアプリのパッケージ名を渡してください。');
+    throw new Error('Pass the package name of a different app as sameAsApp.');
   }
 
   async function apply(edit: WritableEdit, source: AppDetails | undefined) {
@@ -63,7 +63,7 @@ export async function setAppInfo(
     const stored =
       changed.length === 0
         ? current
-        : await edit.change(`App の情報（${changed.join('・')}）を変えた`, () =>
+        : await edit.change(`Changed the app details (${changed.join(', ')})`, () =>
             client.put(path, next, AppDetails),
           );
     return {
@@ -99,6 +99,6 @@ function checkWebsite(website: string | null | undefined): void {
     return;
   }
   if (!URL.canParse(website) || !['http:', 'https:'].includes(new URL(website).protocol)) {
-    throw new Error('ウェブサイトが、http か https の URL ではありません。何も変えていません。');
+    throw new Error('The website is not an http or https URL. Nothing was changed.');
   }
 }

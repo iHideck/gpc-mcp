@@ -9,10 +9,10 @@ type FieldRule = { label: string; limit?: number; url?: true };
 
 // 上限は Play Console ヘルプのもの。全角と半角を区別しない
 const LISTING_FIELDS = {
-  title: { label: 'タイトル', limit: 30 },
-  shortDescription: { label: '簡単な説明', limit: 80 },
-  fullDescription: { label: '詳しい説明', limit: 4000 },
-  video: { label: '動画の URL', url: true },
+  title: { label: 'title', limit: 30 },
+  shortDescription: { label: 'short description', limit: 80 },
+  fullDescription: { label: 'full description', limit: 4000 },
+  video: { label: 'video URL', url: true },
 } satisfies Record<string, FieldRule>;
 
 type ListingField = keyof typeof LISTING_FIELDS;
@@ -36,7 +36,7 @@ export const localizationInput = z.object({
   locale: z
     .string()
     .min(1)
-    .describe('言語のコード（例: ja-JP、en-US）。get_localizations で見られる'),
+    .describe('Language code, for example ja-JP or en-US. get_localizations lists them.'),
   title: requiredText('title'),
   shortDescription: requiredText('shortDescription'),
   fullDescription: requiredText('fullDescription'),
@@ -50,7 +50,7 @@ export const localizationInput = z.object({
     .nullable()
     .optional()
     .describe(
-      `トラックの下書きのリリースのリリースノート。${RELEASE_NOTES_LIMIT} 文字まで。null か空の文字にすると消す。省くと変えない`,
+      `Release notes of the draft release on the track. Up to ${RELEASE_NOTES_LIMIT} characters. Pass null or an empty string to remove them. Omit to leave them unchanged.`,
     ),
 });
 
@@ -125,7 +125,7 @@ export async function setLocalizations(
         }
       }
       if (write.isNew) {
-        warnings.push(`言語 ${write.locale} の掲載情報を新しく作りました。`);
+        warnings.push(`Created a new store listing for ${write.locale}.`);
       }
     }
     if (notesWrite !== undefined && notesWrite.changes.length > 0 && current !== undefined) {
@@ -134,7 +134,7 @@ export async function setLocalizations(
         changes.push({ locale, field: 'releaseNotes', before, after });
         const saved = stored.releaseNotes?.find(({ language }) => language === locale)?.text;
         if ((saved ?? null) !== after) {
-          warnings.push(differentValue(locale, 'リリースノート'));
+          warnings.push(differentValue(locale, 'release notes'));
         }
       }
     }
@@ -143,7 +143,7 @@ export async function setLocalizations(
 }
 
 function differentValue(locale: string, label: string): string {
-  return `Google Play の値が、頼んだものと違います: ${locale} の${label}（Google が直したかもしれません。get_localizations で確かめてください）`;
+  return `The value in Google Play differs from the one you passed: ${locale} ${label}. Google may have corrected it. Check it with get_localizations.`;
 }
 
 async function putListing(
@@ -152,10 +152,10 @@ async function putListing(
   { locale, fields, body }: ListingWrite,
   progress: ReturnType<typeof trackProgress>,
 ): Promise<Listing> {
-  const labels = fields.map((field) => LISTING_FIELDS[field].label).join('・');
-  const what = `${locale} の${labels}`;
-  return progress.write(`${what}を変える`, `${what}を変えました`, () =>
-    edit.change(`${what}を変えた`, () =>
+  const labels = fields.map((field) => LISTING_FIELDS[field].label).join(', ');
+  const what = `the ${locale} ${labels}`;
+  return progress.write(`changing ${what}`, `Changed ${what}`, () =>
+    edit.change(`Changed ${what}`, () =>
       client.put(`${edit.path}/listings/${encodeURIComponent(locale)}`, body, Listing),
     ),
   );
@@ -169,10 +169,10 @@ async function putNotes(
   { draft, changes, releaseNotes }: NotesWrite,
   progress: ReturnType<typeof trackProgress>,
 ): Promise<Release> {
-  const what = `${changes.map(({ locale }) => locale).join('・')} のリリースノート`;
+  const what = `the ${changes.map(({ locale }) => locale).join(', ')} release notes`;
   const next = { ...draft, releaseNotes };
-  const stored = await progress.write(`${what}を変える`, `${what}を変えました`, () =>
-    edit.change(`${what}を変えた`, () =>
+  const stored = await progress.write(`changing ${what}`, `Changed ${what}`, () =>
+    edit.change(`Changed ${what}`, () =>
       writeTrack(
         client,
         edit,
@@ -188,7 +188,7 @@ function checkTexts(localizations: LocalizationInput[]): void {
   const locales = localizations.map(({ locale }) => locale);
   const repeated = [...new Set(locales.filter((locale, i) => locales.indexOf(locale) !== i))];
   const problems = repeated.map(
-    (locale) => `言語 ${locale} が2回以上あります。1つにまとめてください`,
+    (locale) => `${locale} appears more than once. Merge it into one entry`,
   );
   for (const entry of localizations) {
     for (const name of LISTING_FIELD_NAMES) {
@@ -202,7 +202,7 @@ function checkTexts(localizations: LocalizationInput[]): void {
       problems.push(
         ...fieldProblems(
           entry.locale,
-          { label: 'リリースノート', limit: RELEASE_NOTES_LIMIT },
+          { label: 'release notes', limit: RELEASE_NOTES_LIMIT },
           entry.releaseNotes,
         ),
       );
@@ -210,7 +210,7 @@ function checkTexts(localizations: LocalizationInput[]): void {
   }
   if (problems.length > 0) {
     throw new Error(
-      `入れる前に確かめたら、合わない所がありました。何も変えていません。\n${problems.map((problem) => `- ${problem}`).join('\n')}`,
+      `Some values failed the checks. Nothing was changed.\n${problems.map((problem) => `- ${problem}`).join('\n')}`,
     );
   }
 }
@@ -219,11 +219,9 @@ function fieldProblems(locale: string, { label, limit, url }: FieldRule, value: 
   const length = [...value].length;
   return [
     ...(limit !== undefined && length > limit
-      ? [`${locale} の${label}: ${length} 文字（${limit} 文字まで）`]
+      ? [`${locale} ${label}: ${length} characters (limit ${limit})`]
       : []),
-    ...(url === true && !isWebUrl(value)
-      ? [`${locale} の${label}: http か https の URL ではありません`]
-      : []),
+    ...(url === true && !isWebUrl(value) ? [`${locale} ${label}: not an http or https URL`] : []),
   ];
 }
 
@@ -240,11 +238,11 @@ function planListings(localizations: LocalizationInput[], listings: Listing[]): 
       const missing = REQUIRED_FOR_NEW_LOCALE.filter((name) => entry[name] === undefined);
       if (missing.length > 0) {
         problems.push(
-          `言語 ${entry.locale} の掲載情報はありません。新しく作るには、${missing
+          `${entry.locale} has no store listing. To create one, also pass the ${missing
             .map((name) => LISTING_FIELDS[name].label)
             .join(
-              '・',
-            )}も要ります。ある言語は ${listings.map(({ language }) => language).join('、')} です`,
+              ', ',
+            )}. Existing languages: ${listings.map(({ language }) => language).join(', ')}`,
         );
         continue;
       }
@@ -270,7 +268,7 @@ function planListings(localizations: LocalizationInput[], listings: Listing[]): 
     }
   }
   if (problems.length > 0) {
-    throw new Error(`${problems.join('。\n')}。\n何も変えていません。`);
+    throw new Error(`${problems.join('.\n')}.\nNothing was changed.`);
   }
   return writes;
 }
@@ -279,7 +277,7 @@ function planNotes(localizations: LocalizationInput[], current: Track): NotesWri
   const draft = current.releases.find(isDraft);
   if (draft === undefined) {
     throw new Error(
-      `${current.track} に下書きのリリースがありません。select_build でビルドを選んでから、リリースノートを入れてください。何も変えていません。`,
+      `${current.track} has no draft release. Select a build with select_build, then set the release notes. Nothing was changed.`,
     );
   }
   const notes = new Map((draft.releaseNotes ?? []).map(({ language, text }) => [language, text]));
@@ -312,12 +310,13 @@ function isWebUrl(value: string): boolean {
 
 function describeRule({ label, limit, url }: FieldRule, clearable: boolean): string {
   return [
-    label,
-    limit === undefined ? undefined : `${limit} 文字まで`,
-    url === true ? 'http か https の URL' : undefined,
-    clearable ? 'null か空の文字にすると消す' : undefined,
-    '省くと変えない',
+    `The ${label} in the store listing`,
+    limit === undefined ? undefined : `Up to ${limit} characters`,
+    url === true ? 'An http or https URL' : undefined,
+    clearable ? 'Pass null or an empty string to remove it' : undefined,
+    'Omit to leave it unchanged',
   ]
     .filter((part) => part !== undefined)
-    .join('。');
+    .join('. ')
+    .concat('.');
 }

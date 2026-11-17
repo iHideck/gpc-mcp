@@ -52,7 +52,7 @@ export type SetPhasedReleaseResult = {
 };
 
 const DRAFT_APP_HINT =
-  'このアプリはまだ公開していないので、API では下書きまでしか作れません。save_draft で保存してから、Play Console で審査に出してください。';
+  'This app has never been published, so the API can only create drafts. Save the changes with save_draft, then send them for review in Play Console.';
 
 export async function saveDraft(
   { edits }: Play,
@@ -146,7 +146,7 @@ export async function submitForReview(
         .map(({ track: name }) => name);
       if (elsewhere.length > 0) {
         throw new Error(
-          `${track} に下書きのリリースがありません。下書きのあるトラック: ${elsewhere.join('、')}。track を確かめてください。`,
+          `${track} has no draft release. Tracks with a draft release: ${elsewhere.join(', ')}. Check the track.`,
         );
       }
       if (previous.length === 0) {
@@ -172,7 +172,7 @@ export async function submitForReview(
       .filter((release) => isRollout(release) && !kept.includes(release))
       .map(
         ({ name, status }) =>
-          `段階的公開のリリース ${name ?? '（名前なし）'}（${status}）を、新しいリリースで置き換えます。`,
+          `The staged rollout release ${name ?? '(no name)'} (${status}) is replaced by the new release.`,
       );
     try {
       await writeTrack(client, edit, track, [...kept, promoted]);
@@ -190,9 +190,9 @@ export async function submitForReview(
       throw new Error(
         [
           error instanceof Error ? error.message : String(error),
-          '審査に出す途中の状態を残さないよう、まだ送っていない変更を捨てました。',
-          ...(lost.length === 0 ? [] : [`失われた変更: ${lost.join('、')}。`]),
-          'get_release_status で、送られたかを確かめてください。',
+          'Discarded the unsent changes so that no half-submitted state is left.',
+          ...(lost.length === 0 ? [] : [`Lost changes: ${lost.join(', ')}.`]),
+          'Check with get_release_status whether the changes were sent.',
         ].join('\n'),
         { cause: error },
       );
@@ -202,7 +202,7 @@ export async function submitForReview(
       true,
       [
         ...previous,
-        `${track} のリリース（${(draft.versionCodes ?? []).join('・')}）を審査に出した`,
+        `Submitted the ${track} release (${(draft.versionCodes ?? []).join(', ')}) for review`,
       ],
       warnings,
     );
@@ -217,11 +217,11 @@ function checkCountries({
   includeRestOfWorld,
 }: SubmitForReviewRequest): void {
   if (includeRestOfWorld !== undefined && countries === undefined) {
-    throw new Error('includeRestOfWorld は、countries と一緒に渡してください。');
+    throw new Error('Pass includeRestOfWorld together with countries.');
   }
   if (countries !== undefined && (userFraction === undefined || !/(^|:)production$/.test(track))) {
     throw new Error(
-      '国を絞れるのは、製品版のトラックの段階的公開（userFraction を渡すとき）だけです。',
+      'Countries can be targeted only for a staged rollout (with userFraction) on the production track.',
     );
   }
 }
@@ -241,7 +241,7 @@ export async function setPhasedRelease(
   return edits.write(packageName, async (edit) => {
     if (edit.previousChanges.length > 0) {
       throw new Error(
-        `まだ送っていない変更があるので、段階的公開を変えられません（一緒に送られてしまいます）。先に submit_for_review か save_draft で送るか、discard_changes で捨ててください。\nまだ送っていない変更: ${edit.previousChanges.join('、')}`,
+        `Cannot change the staged rollout while there are unsent changes, because they would be sent with it. First send them with submit_for_review or save_draft, or discard them with discard_changes.\nUnsent changes: ${edit.previousChanges.join(', ')}`,
       );
     }
     const { releases } = await readTrack(client, edit, track);
@@ -260,16 +260,16 @@ export async function setPhasedRelease(
       if (action === 'complete' && completed !== undefined) {
         return unchanged(completed);
       }
-      throw new Error(`${track} に、段階的公開を進めているリリースがありません。`);
+      throw new Error(`${track} has no release in a staged rollout.`);
     }
     if (action === 'update' && rollout.status === 'halted') {
       throw new Error(
-        `${track} の段階的公開は止まっています。割合を変えて再開するなら、resume に userFraction を渡してください。`,
+        `The staged rollout on ${track} is paused. To resume it with a new percentage, pass userFraction to resume.`,
       );
     }
     if (action === 'resume' && rollout.userFraction === undefined && userFraction === undefined) {
       throw new Error(
-        `${track} の止まっているリリースには、割合がありません（全員向けのリリースを止めたものです）。resume に userFraction を渡すか、complete で全員に出してください。`,
+        `The paused release on ${track} has no percentage, because it was a release to all users. Pass userFraction to resume, or use complete to release it to all users.`,
       );
     }
     const next = applyAction(rollout, action, userFraction);
@@ -313,9 +313,9 @@ function applyAction(
 
 function checkFraction(action: PhasedReleaseAction, userFraction: number | undefined): void {
   if (action === 'update' && userFraction === undefined) {
-    throw new Error('update には、userFraction（0 より大きく 1 より小さい割合）が要ります。');
+    throw new Error('update requires userFraction (a fraction greater than 0 and less than 1).');
   }
   if ((action === 'pause' || action === 'complete') && userFraction !== undefined) {
-    throw new Error(`${action} には、userFraction を渡せません。`);
+    throw new Error(`${action} does not take userFraction.`);
   }
 }

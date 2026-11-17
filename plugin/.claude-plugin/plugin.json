@@ -1,15 +1,18 @@
 {
   "name": "gpc-mcp",
-  "description": "Google Play Developer API を呼ぶ MCP サーバー（非公式）。Google Play へのリリース作業を、Claude Code に頼めるようにする",
-  "author": { "name": "iHideck", "url": "https://github.com/iHideck" },
+  "description": "Unofficial MCP server for the Google Play Developer API. Lets Claude Code do your Google Play release work.",
+  "author": {
+    "name": "iHideck",
+    "url": "https://github.com/iHideck"
+  },
   "homepage": "https://github.com/iHideck/gpc-mcp",
   "repository": "https://github.com/iHideck/gpc-mcp",
   "keywords": ["google-play", "android", "release"],
   "userConfig": {
     "service_account_key": {
       "type": "file",
-      "title": "サービスアカウントの鍵",
-      "description": "Google Cloud で作ったサービスアカウントの JSON 鍵のファイル（例: ~/.config/gpc-mcp/service-account.json）",
+      "title": "Service account key",
+      "description": "Path of the JSON key file of the service account that you created in Google Cloud, for example ~/.config/gpc-mcp/service-account.json",
       "required": true
     }
   },

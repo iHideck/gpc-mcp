@@ -54,7 +54,7 @@ export async function uploadBundle(
     const versionCode =
       existing?.versionCode ??
       (
-        await edit.change(`App Bundle ${basename(file)} を上げた`, () =>
+        await edit.change(`Uploaded the App Bundle ${basename(file)}`, () =>
           client.upload(
             `${edit.path}/bundles`,
             { contentType: 'application/octet-stream', bytes },
@@ -73,14 +73,14 @@ export async function uploadBundle(
 
 async function readBundle(file: string): Promise<Buffer<ArrayBuffer>> {
   if (!isAbsolute(file)) {
-    throw new Error(`App Bundle は、絶対パスで渡してください: ${file}`);
+    throw new Error(`Pass the App Bundle as an absolute path: ${file}`);
   }
   if (!file.endsWith('.aab')) {
-    throw new Error(`App Bundle（.aab）のファイルを渡してください: ${file}`);
+    throw new Error(`Pass an App Bundle (.aab) file: ${file}`);
   }
   try {
     return await readFile(file);
   } catch (error) {
-    throw new Error(`App Bundle のファイル ${file} を読めません。`, { cause: error });
+    throw new Error(`Cannot read the App Bundle file ${file}.`, { cause: error });
   }
 }

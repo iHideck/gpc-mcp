@@ -34,11 +34,11 @@ export async function selectBuild(
       readTrack(client, edit, track),
     ]);
     if (!builds.some((build) => build.versionCode === versionCode)) {
-      const known = builds.map((build) => build.versionCode).join('・');
+      const known = builds.map((build) => build.versionCode).join(', ');
       throw new Error(
         known === ''
-          ? `ビルド ${versionCode} はありません。まだビルドがありません。`
-          : `ビルド ${versionCode} はありません。あるビルドは ${known} です。`,
+          ? `Build ${versionCode} does not exist. The app has no builds yet.`
+          : `Build ${versionCode} does not exist. Existing builds: ${known}.`,
       );
     }
     const draft = current.releases.find(isDraft);
@@ -64,7 +64,7 @@ export async function selectBuild(
       ...(name === undefined ? {} : { name }),
     };
     const stored = await edit.change(
-      `${track} の下書きのリリースにビルド ${versionCode} を選んだ`,
+      `Selected build ${versionCode} for the draft release on ${track}`,
       () =>
         writeTrack(client, edit, track, [
           ...current.releases.filter((release) => !isDraft(release)),

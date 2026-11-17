@@ -50,8 +50,8 @@ describe('setDataSafety', () => {
   });
 
   it.each([
-    ['絶対パスでない', 'data-safety.csv', '絶対パス'],
-    ['無い', '/nonexistent/data-safety.csv', '読めません'],
+    ['絶対パスでない', 'data-safety.csv', 'absolute path'],
+    ['無い', '/nonexistent/data-safety.csv', 'Cannot read'],
   ])('ファイルのパスが%sときは、何も送らない', async (_, file, message) => {
     const { fake, play } = setup();
 
@@ -65,7 +65,7 @@ describe('setDataSafety', () => {
     const file = await write('other.csv', 'name,value\na,1\n');
 
     await expect(setDataSafety(play, { packageName: PACKAGE, file })).rejects.toThrow(
-      'データセーフティの CSV ではないようです',
+      'does not look like a Data safety CSV',
     );
 
     expect(fake.requests()).toEqual([]);

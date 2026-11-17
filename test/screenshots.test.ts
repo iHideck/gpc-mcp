@@ -85,7 +85,7 @@ describe('replaceScreenshots', () => {
     expect(result.removed).toBe(1);
     expect(result.before.map(({ id }) => id)).toEqual(['old']);
     expect(result.after.map(({ sha256 }) => sha256)).toEqual([sha256(one), sha256(two)]);
-    expect(result.pending?.changes).toEqual(['ja-JP の phoneScreenshots を入れ替えた']);
+    expect(result.pending?.changes).toEqual(['Replaced the ja-JP phoneScreenshots']);
     expect(fake.live.images['ja-JP/phoneScreenshots']?.map(({ id }) => id)).toEqual(['old']);
   });
 
@@ -149,7 +149,7 @@ describe('replaceScreenshots', () => {
       request('phoneScreenshots', [await write('1.png', png(1080, 1920, 6))]),
     );
 
-    expect(result.warnings).toEqual([expect.stringContaining('1.png はアルファのある PNG')]);
+    expect(result.warnings).toEqual([expect.stringContaining('1.png is a PNG with alpha')]);
   });
 
   it('アイコンは、アルファがあっても知らせない', async () => {
@@ -173,7 +173,7 @@ describe('replaceScreenshots', () => {
     ];
 
     await expect(replaceScreenshots(play, request('phoneScreenshots', files))).rejects.toThrow(
-      /small\.png: 大きさが 100x100 です（各辺は 320〜3840 ピクセル）[\s\S]*tall\.png: 大きさが 1000x2100 です（長い辺は短い辺の 2 倍まで）[\s\S]*text\.png: PNG か JPEG の画像として[\s\S]*missing\.png: ファイルを読めません/,
+      /small\.png: Size is 100x100 \(each side must be 320 to 3840 pixels\)[\s\S]*tall\.png: Size is 1000x2100 \(the long side must be at most 2 times the short side\)[\s\S]*text\.png: Cannot read the size as a PNG or JPEG image[\s\S]*missing\.png: Cannot read the file/,
     );
 
     expect(fake.requests()).toEqual([]);
@@ -184,7 +184,7 @@ describe('replaceScreenshots', () => {
 
     await expect(
       replaceScreenshots(play, request('featureGraphic', [await write('fg.png', png(1024, 501))])),
-    ).rejects.toThrow('大きさが 1024x501 です（1024x500 にする）');
+    ).rejects.toThrow('Size is 1024x501 (must be 1024x500)');
   });
 
   it('アイコンは PNG だけを受け付ける', async () => {
@@ -192,7 +192,7 @@ describe('replaceScreenshots', () => {
 
     await expect(
       replaceScreenshots(play, request('icon', [await write('icon.jpg', jpeg(512, 512))])),
-    ).rejects.toThrow('PNG の画像を渡してください');
+    ).rejects.toThrow('Pass a PNG image');
   });
 
   it('1枚だけの種類に2枚渡すと断る', async () => {
@@ -200,7 +200,7 @@ describe('replaceScreenshots', () => {
     const file = await write('icon.png', png(512, 512));
 
     await expect(replaceScreenshots(play, request('icon', [file, file]))).rejects.toThrow(
-      '1 枚まで',
+      'at most 1 image;',
     );
 
     expect(fake.requests()).toEqual([]);
@@ -211,7 +211,7 @@ describe('replaceScreenshots', () => {
 
     await expect(
       replaceScreenshots(play, request('phoneScreenshots', ['screenshot.png'])),
-    ).rejects.toThrow('絶対パスで渡してください');
+    ).rejects.toThrow('Pass an absolute path');
   });
 
   it('途中で止まると、画像がそろっていないことが、まだ送っていない変更で分かる', async () => {
@@ -228,10 +228,10 @@ describe('replaceScreenshots', () => {
         play,
         request('phoneScreenshots', [await write('1.png', png(1080, 1920))]),
       ),
-    ).rejects.toThrow('前の画像を消しました。1.png を上げるところで止まりました');
+    ).rejects.toThrow('Removed the previous images. Stopped while uploading 1.png');
 
     expect(play.edits.pending(PACKAGE)?.changes).toEqual([
-      'ja-JP の phoneScreenshots を入れ替える途中（画像がそろっていません）',
+      'Started replacing the ja-JP phoneScreenshots (some images are missing)',
     ]);
   });
 
@@ -251,16 +251,16 @@ describe('replaceScreenshots', () => {
     });
 
     await expect(replaceScreenshots(play, request('phoneScreenshots', [file]))).rejects.toThrow(
-      '届いたかは分かりません',
+      'unknown whether',
     );
     expect(play.edits.pending(PACKAGE)?.changes).toEqual([
-      'ja-JP の phoneScreenshots を入れ替える途中（画像がそろっていません）（届いたかは分かりません）',
+      'Started replacing the ja-JP phoneScreenshots (some images are missing) (unknown whether it reached Google Play)',
     ]);
 
     const retried = await replaceScreenshots(play, request('phoneScreenshots', [file]));
 
     expect(retried.uploaded).toEqual([]);
-    expect(retried.pending?.changes).toEqual(['ja-JP の phoneScreenshots を入れ替えた']);
+    expect(retried.pending?.changes).toEqual(['Replaced the ja-JP phoneScreenshots']);
   });
 
   it('途中で止まっても、やり直すと全部がそろう', async () => {
@@ -279,12 +279,12 @@ describe('replaceScreenshots', () => {
     });
 
     await expect(replaceScreenshots(play, request('phoneScreenshots', files))).rejects.toThrow(
-      /1\.png を上げました。2\.png を上げるところで止まりました/,
+      /Uploaded 1\.png\. Stopped while uploading 2\.png/,
     );
     const retried = await replaceScreenshots(play, request('phoneScreenshots', files));
 
     expect(retried.after.map(({ sha256 }) => sha256)).toEqual([sha256(one), sha256(two)]);
-    expect(retried.pending?.changes).toEqual(['ja-JP の phoneScreenshots を入れ替えた']);
+    expect(retried.pending?.changes).toEqual(['Replaced the ja-JP phoneScreenshots']);
     expect(fake.openEdits()).toHaveLength(1);
   });
 });

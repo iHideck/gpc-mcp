@@ -70,13 +70,13 @@ const ErrorBody = z.object({
 });
 
 // 書くツールは、いまの状態を読んでから差だけを変えるので、やり直しても二重には変えない
-const RETRY_HINT = '同じ呼び出しをやり直すと、いまの状態に合わせて続きを行います。';
-const WRITE_UNKNOWN_HINT = `変更が Google Play に届いたかは分かりません。${RETRY_HINT}`;
+const RETRY_HINT = 'Retry the same call to continue from the current state.';
+const WRITE_UNKNOWN_HINT = `It is unknown whether the change reached Google Play. ${RETRY_HINT}`;
 
 const HINTS: Partial<Record<number, string>> = {
-  401: 'サービスアカウントの鍵が Google Cloud で有効かを確かめてください。',
-  403: 'サービスアカウントに、この操作の権限がありません。Play Console の「ユーザーと権限」で、サービスアカウントにアプリの権限を与えてください。',
-  429: '呼び出しの上限に達しました。しばらく待ってから、やり直してください。',
+  401: 'Check that the service account key is valid in Google Cloud.',
+  403: 'The service account has no permission for this operation. In Play Console, go to Users and permissions and grant the service account permissions for the app.',
+  429: 'The request quota was reached. Wait a while, then retry.',
 };
 
 // 書かない設定は、値が無いか 0 のときだけ外す。打ち間違い（true など）で、本番に書いてしまわないため
@@ -92,7 +92,7 @@ export function createClient(
   async function send(method: Method, url: URL, content?: Content): Promise<unknown> {
     if (readOnly && method !== 'GET' && !EDIT_HOUSEKEEPING.test(url.pathname)) {
       throw new Error(
-        `書かない設定で動いているので、次のリクエストを送りませんでした: ${method} ${url.pathname}${url.search}${content === undefined ? '' : ` ${content.summary}`}`,
+        `Read-only mode is on, so this request was not sent: ${method} ${url.pathname}${url.search}${content === undefined ? '' : ` ${content.summary}`}`,
       );
     }
     const timeoutMs = content?.timeoutMs ?? TIMEOUT_MS;
@@ -110,7 +110,7 @@ export function createClient(
       });
     } catch (error) {
       throw new UnknownOutcomeError(
-        `Google Play の API に接続できませんでした（${reasonOf(error, timeoutMs)}）。${method === 'GET' ? '' : WRITE_UNKNOWN_HINT}`,
+        `Cannot connect to the Google Play API (${reasonOf(error, timeoutMs)}).${method === 'GET' ? '' : ` ${WRITE_UNKNOWN_HINT}`}`,
         { cause: error },
       );
     }
@@ -152,7 +152,7 @@ export function createClient(
         await send('POST', url, {
           type: contentType,
           payload: bytes,
-          summary: `（${bytes.length} バイト）`,
+          summary: `(${bytes.length} bytes)`,
           timeoutMs: UPLOAD_TIMEOUT_MS,
         }),
         path,
@@ -176,7 +176,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown, path: string): T {
   const result = schema.safeParse(value);
   if (!result.success) {
     throw new Error(
-      `Google Play の API の ${path} の応答が、思っていた形と違います。\n${z.prettifyError(result.error)}`,
+      `The response of ${path} from the Google Play API has an unexpected shape.\n${z.prettifyError(result.error)}`,
     );
   }
   return result.data;
@@ -186,7 +186,7 @@ function parseWritten<T>(schema: z.ZodType<T>, value: unknown, path: string): T 
   const result = schema.safeParse(value);
   if (!result.success) {
     throw new UnknownOutcomeError(
-      `Google Play の API の ${path} の応答が、思っていた形と違います。${WRITE_UNKNOWN_HINT}`,
+      `The response of ${path} from the Google Play API has an unexpected shape. ${WRITE_UNKNOWN_HINT}`,
     );
   }
   return result.data;
@@ -197,7 +197,7 @@ export function reasonOf(error: unknown, timeoutMs = TIMEOUT_MS): string {
     return String(error);
   }
   if (error.name === 'TimeoutError') {
-    return `${timeoutMs / 1000}秒たっても応答がありません`;
+    return `no response in ${timeoutMs / 1000} seconds`;
   }
   // fetch は、DNS や TLS の失敗を cause に入れ、message は「fetch failed」だけにする
   return error.cause instanceof Error ? error.cause.message : error.message;
@@ -214,8 +214,8 @@ function apiError(status: number, body: unknown, suffix?: string): GpcApiError {
   const hint =
     disabled === undefined
       ? HINTS[status]
-      : `Google Cloud のプロジェクトで、この API を有効にしてください。${disabled.metadata?.activationUrl ?? ''}`;
-  const message = [`Google Play の API が ${status} を返しました。`, hint, error?.message, suffix]
+      : `Enable this API in your Google Cloud project. ${disabled.metadata?.activationUrl ?? ''}`.trim();
+  const message = [`The Google Play API returned ${status}.`, hint, error?.message, suffix]
     .filter((line) => line !== undefined)
     .join('\n');
   return new GpcApiError(status, message, reasons);

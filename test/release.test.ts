@@ -55,7 +55,7 @@ describe('saveDraft', () => {
 
     const result = await saveDraft(play, { packageName: PACKAGE });
 
-    expect(result.saved).toEqual(['App の情報（contactEmail）を変えた']);
+    expect(result.saved).toEqual(['Changed the app details (contactEmail)']);
     expect(fake.live.details.contactEmail).toBe('new@example.com');
     expect(commitSearch(fake)?.get('changesInReviewBehavior')).toBe('ERROR_IF_IN_REVIEW');
     expect(commitSearch(fake)?.has('changesNotSentForReview')).toBe(false);
@@ -91,7 +91,7 @@ describe('saveDraft', () => {
     await changeEmail({ play });
 
     await expect(saveDraft(play, { packageName: PACKAGE })).rejects.toThrow(
-      /notSentForReview: true で保存[\s\S]*changesNotSentForReview to true/,
+      /Save them with notSentForReview: true[\s\S]*changesNotSentForReview to true/,
     );
 
     expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
@@ -104,7 +104,7 @@ describe('saveDraft', () => {
     await changeEmail({ play });
 
     await expect(saveDraft(play, { packageName: PACKAGE, notSentForReview: true })).rejects.toThrow(
-      'notSentForReview を外してください',
+      'Remove notSentForReview',
     );
   });
 
@@ -113,7 +113,7 @@ describe('saveDraft', () => {
     await changeEmail({ play });
 
     await expect(saveDraft(play, { packageName: PACKAGE })).rejects.toThrow(
-      /審査中の変更があるので、送りませんでした[\s\S]*cancelChangesInReview/,
+      /Nothing was sent because some changes are in review[\s\S]*cancelChangesInReview/,
     );
 
     expect(fake.live.details.contactEmail).toBe(DETAILS.contactEmail);
@@ -134,7 +134,7 @@ describe('validateChanges', () => {
       packageName: PACKAGE,
       valid: true,
       problem: null,
-      changes: ['App の情報（contactEmail）を変えた'],
+      changes: ['Changed the app details (contactEmail)'],
     });
     expect(fake.live.details.contactEmail).toBe(DETAILS.contactEmail);
     expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
@@ -166,7 +166,7 @@ describe('validateChanges', () => {
     });
     await changeEmail({ play });
 
-    await expect(validateChanges(play, PACKAGE)).rejects.toThrow('無効になりました');
+    await expect(validateChanges(play, PACKAGE)).rejects.toThrow('no longer valid');
   });
 
   it.each([401, 403, 429])('%d は、断られた扱いにしない', async (status) => {
@@ -231,7 +231,7 @@ describe('submitForReview の途中で通信が切れたとき', () => {
     await changeEmail({ play });
     failing(fake, (url) => url.includes(':commit'));
 
-    await expect(submitForReview(play, submit)).rejects.toThrow('届いたかは分かりません');
+    await expect(submitForReview(play, submit)).rejects.toThrow('unknown whether');
 
     const [[id] = []] = fake.openEdits();
     expect(fake.snapshotOf(id ?? '')?.tracks.production).toEqual([COMPLETED, DRAFT]);
@@ -249,7 +249,7 @@ describe('submitForReview の途中で通信が切れたとき', () => {
     respondThenDrop(fake, (url) => url.includes(':commit'));
 
     await expect(submitForReview(play, submit)).rejects.toThrow(
-      /捨てました[\s\S]*失われた変更: App の情報[\s\S]*get_release_status/,
+      /Discarded the unsent changes[\s\S]*Lost changes: Changed the app details[\s\S]*get_release_status/,
     );
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
@@ -272,7 +272,7 @@ describe('submitForReview の途中で通信が切れたとき', () => {
       return original(input, init);
     });
 
-    await expect(submitForReview(play, submit)).rejects.toThrow('捨てました');
+    await expect(submitForReview(play, submit)).rejects.toThrow('Discarded the unsent changes');
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
     expect(fake.live.tracks.production).toEqual([COMPLETED, DRAFT]);
@@ -288,7 +288,7 @@ describe('submitForReview の途中で通信が切れたとき', () => {
     await changeEmail({ play });
     respondThenDrop(fake, (url, init) => init?.method === 'PUT' && url.endsWith('/production'));
 
-    await expect(submitForReview(play, submit)).rejects.toThrow('届いたかは分かりません');
+    await expect(submitForReview(play, submit)).rejects.toThrow('unknown whether');
 
     const [[id] = []] = fake.openEdits();
     expect(fake.snapshotOf(id ?? '')?.tracks.production).toEqual([COMPLETED, DRAFT]);
@@ -303,7 +303,7 @@ describe('submitForReview', () => {
     await submitForReview(play, { ...submit, userFraction: 0.2 });
 
     await expect(setPhasedRelease(play, { ...submit, action: 'pause' })).rejects.toThrow(
-      '審査中の変更があるので',
+      'some changes are in review',
     );
     expect(fake.live.tracks.production?.[1]?.status).toBe('inProgress');
   });
@@ -322,7 +322,7 @@ describe('submitForReview', () => {
     expect(result.submitted).toBe(true);
     expect(result.release?.before.status).toBe('draft');
     expect(result.release?.after.status).toBe('completed');
-    expect(result.sent).toEqual(['production のリリース（2）を審査に出した']);
+    expect(result.sent).toEqual(['Submitted the production release (2) for review']);
     expect(result.review).toEqual([{ releaseName: '1.0.1', state: 'IN_REVIEW', versionCodes: [] }]);
     expect(fake.live.tracks.production).toEqual([{ ...DRAFT, status: 'completed' }]);
     expect(play.edits.pending(PACKAGE)).toBeNull();
@@ -388,16 +388,16 @@ describe('submitForReview', () => {
   });
 
   it.each([
-    ['段階的公開でない', { ...submit, countries: ['JP'] }, '段階的公開'],
+    ['段階的公開でない', { ...submit, countries: ['JP'] }, 'staged rollout'],
     [
       '製品版でない',
       { ...submit, track: 'alpha', userFraction: 0.2, countries: ['JP'] },
-      '製品版のトラック',
+      'production track',
     ],
     [
       'countries が無いのに includeRestOfWorld を渡す',
       { ...submit, userFraction: 0.2, includeRestOfWorld: true },
-      'countries と一緒に',
+      'together with countries',
     ],
   ])('%sときは、何も送らずに断る', async (_, request, message) => {
     const { fake, play } = setup();
@@ -419,7 +419,7 @@ describe('submitForReview', () => {
     const result = await submitForReview(play, submit);
 
     expect(result.warnings).toEqual([
-      '段階的公開のリリース 1.0.1（inProgress）を、新しいリリースで置き換えます。',
+      'The staged rollout release 1.0.1 (inProgress) is replaced by the new release.',
     ]);
     expect(fake.live.tracks.production).toEqual([{ ...DRAFT, status: 'completed' }]);
   });
@@ -431,8 +431,8 @@ describe('submitForReview', () => {
     const result = await submitForReview(play, submit);
 
     expect(result.sent).toEqual([
-      'App の情報（contactEmail）を変えた',
-      'production のリリース（2）を審査に出した',
+      'Changed the app details (contactEmail)',
+      'Submitted the production release (2) for review',
     ]);
     expect(fake.live.details.contactEmail).toBe('new@example.com');
   });
@@ -461,7 +461,7 @@ describe('submitForReview', () => {
     const { fake, play } = setup({ tracks: { production: [COMPLETED], alpha: [DRAFT] } });
 
     await expect(submitForReview(play, submit)).rejects.toThrow(
-      'production に下書きのリリースがありません。下書きのあるトラック: alpha',
+      'production has no draft release. Tracks with a draft release: alpha',
     );
 
     expect(commitSearch(fake)).toBeUndefined();
@@ -491,7 +491,7 @@ describe('submitForReview', () => {
     const { fake, play } = setup({ draftApp: true, tracks: { production: [DRAFT] } });
 
     await expect(submitForReview(play, submit)).rejects.toThrow(
-      /save_draft で保存してから、Play Console で審査に出して[\s\S]*draft app/,
+      /Save the changes with save_draft, then send them for review in Play Console[\s\S]*draft app/,
     );
 
     expect(commitSearch(fake)).toBeUndefined();
@@ -552,7 +552,7 @@ describe('setPhasedRelease', () => {
 
     await expect(
       setPhasedRelease(play, { ...request, action: 'update', userFraction: 0.5 }),
-    ).rejects.toThrow('resume に userFraction を渡してください');
+    ).rejects.toThrow('pass userFraction to resume');
 
     expect(fake.live.tracks.production).toEqual([COMPLETED, halted]);
   });
@@ -562,7 +562,7 @@ describe('setPhasedRelease', () => {
     const { fake, play } = setup({ tracks: { production: [halted, COMPLETED] } });
 
     await expect(setPhasedRelease(play, { ...request, action: 'resume' })).rejects.toThrow(
-      '割合がありません',
+      'has no percentage',
     );
     expect(commitSearch(fake)).toBeUndefined();
 
@@ -590,7 +590,7 @@ describe('setPhasedRelease', () => {
     const { fake, play } = withRollout();
 
     await expect(setPhasedRelease(play, { ...request, action: 'update' })).rejects.toThrow(
-      'update には、userFraction',
+      'update requires userFraction',
     );
 
     expect(fake.requests()).toEqual([]);
@@ -600,7 +600,7 @@ describe('setPhasedRelease', () => {
     const { play } = withRollout();
 
     await expect(setPhasedRelease(play, { ...request, action, userFraction: 0.5 })).rejects.toThrow(
-      'userFraction を渡せません',
+      'does not take userFraction',
     );
   });
 
@@ -706,7 +706,7 @@ describe('setPhasedRelease', () => {
     const { play } = setup({ tracks: { production: [COMPLETED] } });
 
     await expect(setPhasedRelease(play, { ...request, action, userFraction: 0.5 })).rejects.toThrow(
-      '段階的公開を進めているリリースがありません',
+      'has no release in a staged rollout',
     );
   });
 
@@ -714,7 +714,7 @@ describe('setPhasedRelease', () => {
     const { play } = setup({ tracks: { production: [] } });
 
     await expect(setPhasedRelease(play, { ...request, action: 'pause' })).rejects.toThrow(
-      '段階的公開を進めているリリースがありません',
+      'has no release in a staged rollout',
     );
   });
 
@@ -723,7 +723,7 @@ describe('setPhasedRelease', () => {
     await changeEmail({ play });
 
     await expect(setPhasedRelease(play, { ...request, action: 'pause' })).rejects.toThrow(
-      /まだ送っていない変更があるので[\s\S]*App の情報/,
+      /while there are unsent changes[\s\S]*Changed the app details/,
     );
 
     expect(commitSearch(fake)).toBeUndefined();

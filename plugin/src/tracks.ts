@@ -124,7 +124,7 @@ export async function createTrack(
   return edits.write(packageName, async (edit) => {
     const exists = (await listTracks(client, edit)).some(({ track: name }) => name === track);
     if (!exists) {
-      await edit.change(`クローズドテストのトラック ${track} を作った`, () =>
+      await edit.change(`Created the closed testing track ${track}`, () =>
         client.post(
           `${edit.path}/tracks`,
           {},
@@ -146,7 +146,7 @@ function formFactorOf(track: string): string {
   const formFactor = FORM_FACTOR_OF_PREFIX[prefix];
   if (formFactor === undefined) {
     throw new Error(
-      `トラックの名前の接頭辞 ${prefix}: には、対応していません。クローズドテストのトラックを作れるのは、接頭辞なし（電話）・wear:・automotive: だけです。`,
+      `The track name prefix ${prefix}: is not supported. Closed testing tracks can be created with no prefix (phone), wear:, or automotive: only.`,
     );
   }
   return formFactor;

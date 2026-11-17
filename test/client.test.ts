@@ -19,10 +19,10 @@ describe('createClient', () => {
         AppEdit,
       ),
     ).rejects.toThrow(
-      `送りませんでした: POST ${APP}/edits/e1:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`,
+      `this request was not sent: POST ${APP}/edits/e1:commit?changesInReviewBehavior=ERROR_IF_IN_REVIEW`,
     );
     await expect(client.remove(`${APP}/edits/e1/listings/ja-JP/icon`)).rejects.toThrow(
-      `送りませんでした: DELETE ${APP}/edits/e1/listings/ja-JP/icon`,
+      `this request was not sent: DELETE ${APP}/edits/e1/listings/ja-JP/icon`,
     );
     expect(fetchFn).not.toHaveBeenCalled();
   });

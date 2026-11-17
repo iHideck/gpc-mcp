@@ -37,7 +37,9 @@ describe('selectBuild', () => {
 
     expect(result.before).toBeNull();
     expect(result.after).toMatchObject({ status: 'draft', versionCodes: ['2'] });
-    expect(result.pending?.changes).toEqual(['production の下書きのリリースにビルド 2 を選んだ']);
+    expect(result.pending?.changes).toEqual([
+      'Selected build 2 for the draft release on production',
+    ]);
     const [[id] = []] = fake.openEdits();
     expect(fake.snapshotOf(id ?? '')?.tracks.production).toEqual([
       COMPLETED,
@@ -117,7 +119,7 @@ describe('selectBuild', () => {
     const { fake, play } = setup({ production: [COMPLETED] });
 
     await expect(selectBuild(play, { ...request, versionCode: 9 })).rejects.toThrow(
-      'ビルド 9 はありません。あるビルドは 3・2・1 です。',
+      'Build 9 does not exist. Existing builds: 3, 2, 1.',
     );
 
     expect(fake.openEdits()).toEqual([]);

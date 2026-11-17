@@ -29,7 +29,7 @@ describe('setAppInfo', () => {
 
     expect(result.before).toEqual(DETAILS);
     expect(result.after).toEqual({ ...DETAILS, contactEmail: 'new@example.com' });
-    expect(result.pending?.changes).toEqual(['App の情報（contactEmail）を変えた']);
+    expect(result.pending?.changes).toEqual(['Changed the app details (contactEmail)']);
     expect(fake.live.details).toEqual(DETAILS);
   });
 
@@ -114,7 +114,7 @@ describe('setAppInfo', () => {
 
       await expect(
         setAppInfo(play, { packageName: PACKAGE, sameAsApp: 'com.example.source' }),
-      ).rejects.toThrow('まだ送っていない変更があるので');
+      ).rejects.toThrow('has unsent changes');
 
       expect(fake.requests().some((request) => request.includes('com.example.source'))).toBe(false);
       expect(play.edits.pending(PACKAGE)?.changes).toHaveLength(1);
@@ -126,7 +126,7 @@ describe('setAppInfo', () => {
 
       await expect(
         setAppInfo(play, { packageName: PACKAGE, sameAsApp: 'com.example.source' }),
-      ).rejects.toThrow('com.example.source にまだ送っていない変更があるので');
+      ).rejects.toThrow('com.example.source has unsent changes');
 
       expect(play.edits.pending('com.example.source')?.changes).toHaveLength(1);
       expect(fake.openEdits()).toHaveLength(1);
@@ -146,7 +146,7 @@ describe('setAppInfo', () => {
           packageName: PACKAGE,
           sameAsApp: 'com.example.source',
         }),
-      ).rejects.toThrow('com.example.source にまだ送っていない変更があるので');
+      ).rejects.toThrow('com.example.source has unsent changes');
     });
 
     it('同時に呼んだ書くツールの変更を、確かめたあとに割り込ませない', async () => {
@@ -167,7 +167,7 @@ describe('setAppInfo', () => {
       const { play } = setupWithSource();
 
       await expect(setAppInfo(play, { packageName: PACKAGE, sameAsApp: PACKAGE })).rejects.toThrow(
-        '別のアプリのパッケージ名',
+        'package name of a different app',
       );
     });
   });
@@ -177,7 +177,7 @@ describe('setAppInfo', () => {
 
     await expect(
       setAppInfo(play, { packageName: PACKAGE, contactWebsite: 'example.com' }),
-    ).rejects.toThrow('http か https の URL ではありません');
+    ).rejects.toThrow('not an http or https URL');
 
     expect(fake.requests()).toEqual([]);
   });

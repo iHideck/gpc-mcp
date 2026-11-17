@@ -148,6 +148,6 @@ describe('createTokenSource', () => {
     const result = createTokenSource(await credentials(), fetchFn)();
 
     await expect(result).rejects.toThrow(ConfigError);
-    await expect(result).rejects.toThrow(/有効かを確かめて[\s\S]*Invalid JWT Signature/);
+    await expect(result).rejects.toThrow(/valid in Google Cloud[\s\S]*Invalid JWT Signature/);
   });
 });

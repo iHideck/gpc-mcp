@@ -25,18 +25,18 @@ export async function setDataSafety(
 
 async function readCsv(file: string): Promise<string> {
   if (!isAbsolute(file)) {
-    throw new Error(`CSV は、絶対パスで渡してください: ${file}`);
+    throw new Error(`Pass the CSV as an absolute path: ${file}`);
   }
   let csv: string;
   try {
     csv = await readFile(file, 'utf8');
   } catch (error) {
-    throw new Error(`CSV のファイル ${file} を読めません。`, { cause: error });
+    throw new Error(`Cannot read the CSV file ${file}.`, { cause: error });
   }
   const header = csv.split('\n', 1)[0] ?? '';
   if (!/question id/i.test(header) || !/response value/i.test(header)) {
     throw new Error(
-      `${file} は、データセーフティの CSV ではないようです。Play Console のデータセーフティの画面から書き出せる形（Question ID・Response value などの列）にしてください。何も送っていません。`,
+      `${file} does not look like a Data safety CSV. Use the format that the Data safety page in Play Console exports, with columns such as Question ID and Response value. Nothing was sent.`,
     );
   }
   return csv;

@@ -19,7 +19,7 @@ describe('createTrack', () => {
     const result = await createTrack(play, request);
 
     expect(result).toMatchObject({ created: true });
-    expect(result.pending?.changes).toEqual(['クローズドテストのトラック closed-1 を作った']);
+    expect(result.pending?.changes).toEqual(['Created the closed testing track closed-1']);
     const [[id] = []] = fake.openEdits();
     expect(Object.keys(fake.snapshotOf(id ?? '')?.tracks ?? {})).toContain('closed-1');
     expect(Object.keys(fake.live.tracks)).not.toContain('closed-1');
@@ -58,7 +58,7 @@ describe('createTrack', () => {
     const { fake, play } = setup();
 
     await expect(createTrack(play, { ...request, track: 'tv:closed-1' })).rejects.toThrow(
-      '対応していません',
+      'is not supported',
     );
 
     expect(fake.requests()).toEqual([]);

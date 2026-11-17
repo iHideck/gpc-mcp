@@ -32,13 +32,13 @@ const screenshot = (label: string, minSide: number, maxSide: number): ImageRule 
 
 // Play Console ヘルプの「プレビュー アセットを追加する」の規格
 export const IMAGE_TYPES = {
-  phoneScreenshots: screenshot('電話の画面写真', 320, 3840),
-  sevenInchScreenshots: screenshot('7 インチのタブレットの画面写真', 320, 7680),
-  tenInchScreenshots: screenshot('10 インチのタブレットの画面写真', 320, 7680),
-  tvScreenshots: screenshot('Android TV の画面写真', 320, 3840),
-  wearScreenshots: screenshot('Wear OS の画面写真', 384, 3840),
+  phoneScreenshots: screenshot('phone screenshots', 320, 3840),
+  sevenInchScreenshots: screenshot('7-inch tablet screenshots', 320, 7680),
+  tenInchScreenshots: screenshot('10-inch tablet screenshots', 320, 7680),
+  tvScreenshots: screenshot('Android TV screenshots', 320, 3840),
+  wearScreenshots: screenshot('Wear OS screenshots', 384, 3840),
   icon: {
-    label: 'アプリのアイコン',
+    label: 'app icon',
     maxFiles: 1,
     formats: ['png'],
     size: { exact: '512x512' },
@@ -46,7 +46,7 @@ export const IMAGE_TYPES = {
     noAlpha: false,
   },
   featureGraphic: {
-    label: 'フィーチャーグラフィック',
+    label: 'feature graphic',
     maxFiles: 1,
     formats: ANY_FORMAT,
     size: { exact: '1024x500' },
@@ -54,7 +54,7 @@ export const IMAGE_TYPES = {
     noAlpha: true,
   },
   tvBanner: {
-    label: 'Android TV のバナー',
+    label: 'Android TV banner',
     maxFiles: 1,
     formats: ANY_FORMAT,
     size: { exact: '1280x720' },
@@ -118,7 +118,7 @@ export async function replaceScreenshots(
       .filter(({ hasAlpha }) => hasAlpha && IMAGE_TYPES[imageType].noAlpha)
       .map(
         ({ fileName }) =>
-          `${fileName} はアルファのある PNG です。Google Play の規格はアルファの無い PNG なので、断られたらアルファを外してください。`,
+          `${fileName} is a PNG with alpha. Google Play requires PNG images without alpha, so remove the alpha channel if Google Play rejects it.`,
       );
     const result = (
       uploaded: string[],
@@ -136,8 +136,8 @@ export async function replaceScreenshots(
       warnings,
     });
     // 途中で止まると、前の画像が消えたまま送られることがある。止まったことが pending で分かるようにする
-    const unfinished = `${locale} の ${imageType} を入れ替える途中（画像がそろっていません）`;
-    const finished = `${locale} の ${imageType} を入れ替えた`;
+    const unfinished = `Started replacing the ${locale} ${imageType} (some images are missing)`;
+    const finished = `Replaced the ${locale} ${imageType}`;
     if (sameImages(before, images)) {
       edit.finishChange(unfinished, finished);
       return result([], 0, before);
@@ -145,12 +145,12 @@ export async function replaceScreenshots(
     const progress = trackProgress();
     // 順番を変える API が無いので、入れ直して順番をそろえる
     if (before.length > 0) {
-      await progress.write('前の画像を消す', '前の画像を消しました', () =>
+      await progress.write('removing the previous images', 'Removed the previous images', () =>
         edit.change(unfinished, () => client.remove(path)),
       );
     }
     for (const { fileName, bytes, contentType } of images) {
-      await progress.write(`${fileName} を上げる`, `${fileName} を上げました`, () =>
+      await progress.write(`uploading ${fileName}`, `Uploaded ${fileName}`, () =>
         edit.change(unfinished, () => client.upload(path, { contentType, bytes }, ImageUpload)),
       );
     }
@@ -184,7 +184,7 @@ async function readImageFiles(paths: string[], imageType: ImageType): Promise<Im
   const rule: ImageRule = IMAGE_TYPES[imageType];
   if (paths.length > rule.maxFiles) {
     throw new Error(
-      `${imageType}（${rule.label}）には ${rule.maxFiles} 枚まで入れられます（${paths.length} 枚渡されました）。何も変えていません。`,
+      `${imageType} (${rule.label}) accepts at most ${rule.maxFiles} image${rule.maxFiles === 1 ? '' : 's'}; ${paths.length} were passed. Nothing was changed.`,
     );
   }
   const checks = await Promise.all(paths.map((path) => checkFile(path, rule)));
@@ -194,7 +194,7 @@ async function readImageFiles(paths: string[], imageType: ImageType): Promise<Im
   if (problems.length > 0) {
     throw new Error(
       [
-        `次の画像は ${imageType}（${rule.label}）に入れられないので、何も変えていません。`,
+        `These images cannot be used as ${imageType} (${rule.label}), so nothing was changed.`,
         ...problems,
       ].join('\n'),
     );
@@ -207,23 +207,23 @@ async function checkFile(
   rule: ImageRule,
 ): Promise<{ file: ImageFile } | { problem: string }> {
   if (!isAbsolute(path)) {
-    return { problem: '絶対パスで渡してください' };
+    return { problem: 'Pass an absolute path' };
   }
   let bytes: Buffer<ArrayBuffer>;
   try {
     bytes = await readFile(path);
   } catch {
-    return { problem: 'ファイルを読めません' };
+    return { problem: 'Cannot read the file' };
   }
   if (bytes.length > rule.maxBytes) {
-    return { problem: `${bytes.length} バイトあります（${rule.maxBytes} バイトまで）` };
+    return { problem: `${bytes.length} bytes (limit ${rule.maxBytes} bytes)` };
   }
   const image = parseImage(bytes);
   if (image === undefined) {
-    return { problem: 'PNG か JPEG の画像として、大きさを読めません' };
+    return { problem: 'Cannot read the size as a PNG or JPEG image' };
   }
   if (!rule.formats.includes(image.format)) {
-    return { problem: `${rule.formats.join('・').toUpperCase()} の画像を渡してください` };
+    return { problem: `Pass a ${rule.formats.join(' or ').toUpperCase()} image` };
   }
   const sizeProblem = checkSize(image.width, image.height, rule.size);
   if (sizeProblem !== undefined) {
@@ -243,15 +243,15 @@ async function checkFile(
 function checkSize(width: number, height: number, size: ImageRule['size']): string | undefined {
   const actual = `${width}x${height}`;
   if ('exact' in size) {
-    return actual === size.exact ? undefined : `大きさが ${actual} です（${size.exact} にする）`;
+    return actual === size.exact ? undefined : `Size is ${actual} (must be ${size.exact})`;
   }
   const shorter = Math.min(width, height);
   const longer = Math.max(width, height);
   if (shorter < size.minSide || longer > size.maxSide) {
-    return `大きさが ${actual} です（各辺は ${size.minSide}〜${size.maxSide} ピクセル）`;
+    return `Size is ${actual} (each side must be ${size.minSide} to ${size.maxSide} pixels)`;
   }
   return longer > shorter * size.maxRatio
-    ? `大きさが ${actual} です（長い辺は短い辺の ${size.maxRatio} 倍まで）`
+    ? `Size is ${actual} (the long side must be at most ${size.maxRatio} times the short side)`
     : undefined;
 }
 
