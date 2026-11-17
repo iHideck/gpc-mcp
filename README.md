@@ -2,7 +2,7 @@
 
 English | [日本語](README.ja.md)
 
-An unofficial MCP server for the Google Play Developer API. Install it as a Claude Code plugin, then ask Claude Code to do your Google Play release work.
+An unofficial MCP server for the Google Play Developer API. Install it as a Claude Code plugin, or run it with `npx` in any MCP client, then ask Claude to do your Google Play release work.
 
 ## Tools
 
@@ -27,7 +27,7 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `set_phased_release` | Pauses, resumes, changes the percentage of, or completes a staged rollout. Pausing with no staged rollout halts the full release. New users and users who update get the previous full release, and users who already installed it are not affected. You cannot undo a release to all users. Each call requires your confirmation. |
 | `discard_changes` | Discards all changes that you have not sent to Google Play. |
 
-Tools that prepare a release write to *unsent changes*. Google Play receives nothing until `submit_for_review` or `save_draft` runs. Unsent changes stay across Claude Code restarts. They are lost when they expire or when someone changes the app in Play Console. They can also be lost when you work on another app, because Google documents one open edit per user. The tools report the loss.
+Tools that prepare a release write to *unsent changes*. Google Play receives nothing until `submit_for_review` or `save_draft` runs. In Claude Code, unsent changes stay across restarts. They are lost when they expire or when someone changes the app in Play Console. They can also be lost when you work on another app, because Google documents one open edit per user. The tools report the loss.
 
 The Google Play API has no way to set the category, price, countries, or the App content declarations other than Data safety, to publish an update held by managed publishing, or to withdraw a review. Do these in Play Console.
 
@@ -37,7 +37,9 @@ The Google Play API has no way to set the category, price, countries, or the App
 
 ## Install
 
-The MCP server runs on the Node in your PATH. It requires Node 24 or later.
+The MCP server requires Node 24 or later.
+
+### Set up a service account
 
 1. In the Google Cloud console, choose a project and enable the **Google Play Android Developer API** and the **Google Play Developer Reporting API**. Then create a service account and download a JSON key for it.
 2. Move the JSON key to a path of your choice, for example `~/.config/gpc-mcp/service-account.json`. Run `chmod 600` on the file so that only you can read it.
@@ -46,18 +48,58 @@ The MCP server runs on the Node in your PATH. It requires Node 24 or later.
    - **Release to production, exclude devices, and use Play App Signing**
    - **Release apps to testing tracks**
    - **Manage store presence**
-4. In Claude Code, run these commands:
+
+### Claude Code
+
+1. In Claude Code, run these commands:
 
    ```
    /plugin marketplace add iHideck/gpc-mcp
    /plugin install gpc-mcp@gpc-mcp
    ```
 
-5. On the configuration screen, enter the path of the JSON key. To change it later, run `/plugin configure gpc-mcp@gpc-mcp`.
+2. On the configuration screen, enter the path of the JSON key. To change it later, run `/plugin configure gpc-mcp@gpc-mcp`.
+
+The plugin runs the MCP server on the Node in your PATH.
+
+### Other MCP clients
+
+In Claude Desktop, Cursor, and other MCP clients, run the server with `npx`. Add this server to the MCP configuration of the client, for example `claude_desktop_config.json` for Claude Desktop or `~/.cursor/mcp.json` for Cursor:
+
+```json
+{
+  "mcpServers": {
+    "gpc": {
+      "command": "npx",
+      "args": ["-y", "@ihideck/gpc-mcp"],
+      "env": {
+        "GPC_SERVICE_ACCOUNT_KEY": "/Users/you/.config/gpc-mcp/service-account.json"
+      }
+    }
+  }
+}
+```
+
+To run the server from source instead, clone the repository and install the dependencies:
+
+```sh
+git clone https://github.com/iHideck/gpc-mcp.git
+cd gpc-mcp
+npm ci --prefix plugin
+```
+
+Then set `"command": "node"` and `"args": ["/absolute/path/to/gpc-mcp/plugin/src/index.ts"]` in the configuration above.
+
+Outside Claude Code, note the following:
+
+- Set `GPC_SERVICE_ACCOUNT_KEY` to an absolute path, or a path that starts with `~/`.
+- Claude Code asks for confirmation before each call to a tool that sends changes to Google Play. Other clients may not. Set the client to ask for approval of `save_draft`, `submit_for_review`, `set_phased_release`, and `set_data_safety`.
+- Unsent changes are kept only while the server runs.
+- The release skill is not loaded. To use it, give the client the instructions in [`plugin/skills/release/SKILL.md`](plugin/skills/release/SKILL.md).
 
 ## Development
 
-The plugin is in `plugin/`. With the plugin, Claude Code installs only the dependencies in `plugin/package.json`. Keep development tools such as ESLint in the root `package.json`.
+The plugin is in `plugin/`. With the plugin, Claude Code installs only the dependencies in `plugin/package.json`. Keep development tools such as ESLint in the root `package.json`. The npm package `@ihideck/gpc-mcp` is also published from `plugin/`.
 
 | Command | What it does |
 | :- | :- |
@@ -66,7 +108,10 @@ The plugin is in `plugin/`. With the plugin, Claude Code installs only the depen
 | `make download-discovery` | Downloads the current API specifications from Google to `.local/` again. |
 | `make validate-plugin` | Validates the plugin and marketplace configuration. |
 | `make run-claude` | Starts Claude Code connected to the MCP server from your local source. |
+| `make pack-npm` | Builds the npm package into `.local/` and checks that `npx` starts the server from it. |
 
 The tests check that the path, parameters, and values of each request exist in the API specifications. Each CI run downloads the current specifications from Google and checks against them.
 
 To test your local source against the real API, put the path of the JSON key in the `GPC_SERVICE_ACCOUNT_KEY` environment variable, then run `make run-claude`. The plugin configuration does not reach a plugin that `claude --plugin-dir` loads. In this setup, tools that write do not change Google Play. Instead, they return the request they would have sent as an error. To write to Google Play, also set `GPC_READ_ONLY=0`.
+
+To publish to npm, run `npm publish` in `plugin/`. Its `prepack` script compiles `plugin/src/` to JavaScript in `plugin/dist/`, because Node does not strip types from files under `node_modules`. The Claude Code plugin runs `plugin/src/index.ts` directly.

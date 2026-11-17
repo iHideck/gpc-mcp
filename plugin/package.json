@@ -1,11 +1,40 @@
 {
-  "name": "gpc-mcp",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Google Play Developer API を呼ぶ MCP サーバー（非公式）",
+  "name": "@ihideck/gpc-mcp",
+  "version": "1.0.0",
+  "description": "Unofficial MCP server for the Google Play Developer API",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "google-play",
+    "google-play-console",
+    "android",
+    "release"
+  ],
+  "homepage": "https://github.com/iHideck/gpc-mcp#readme",
+  "bugs": "https://github.com/iHideck/gpc-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iHideck/gpc-mcp.git",
+    "directory": "plugin"
+  },
+  "license": "MIT",
+  "author": "iHideck",
   "type": "module",
+  "bin": {
+    "gpc-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "tsc -p tsconfig.build.json && cp ../README.md ../LICENSE .",
+    "postpack": "rm README.md LICENSE"
+  },
   "engines": {
     "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",

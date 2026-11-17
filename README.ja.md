@@ -2,7 +2,7 @@
 
 [English](README.md) | 日本語
 
-Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Code のプラグインとして入れ、Google Play へのリリース作業を Claude Code に頼めるようにする。
+Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Code のプラグインとして入れるか、ほかの MCP クライアントで `npx` で動かし、Google Play へのリリース作業を Claude に頼めるようにする。
 
 ## ツール
 
@@ -27,7 +27,7 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `set_phased_release` | 段階的公開を、止める・再開する・割合を変える・全員に出す。段階的公開が無いときに止めると、全員に出したリリースを止める。新しく入れる人と更新する人には、その前の全員向けのリリースが配られ、もう入れた人はそのまま。全員に出すのは取り消せない。呼ぶたびに、利用者の確認が要る |
 | `discard_changes` | まだ Google Play に送っていない変更を捨てる |
 
-準備のツールは、「まだ送っていない変更」に入れるだけで、`submit_for_review` か `save_draft` を呼ぶまで、Google Play には何も届かない。まだ送っていない変更は、Claude Code を起動し直しても残る。有効期限が切れるか、Play Console でアプリを変えると失われる。Google の文書では開ける edit が利用者につき1つなので、別のアプリを操作しても失われることがある。失われたら、ツールが知らせる。
+準備のツールは、「まだ送っていない変更」に入れるだけで、`submit_for_review` か `save_draft` を呼ぶまで、Google Play には何も届かない。Claude Code では、まだ送っていない変更は、起動し直しても残る。有効期限が切れるか、Play Console でアプリを変えると失われる。Google の文書では開ける edit が利用者につき1つなので、別のアプリを操作しても失われることがある。失われたら、ツールが知らせる。
 
 カテゴリ・価格・配信する国・データセーフティ以外のアプリのコンテンツの申告、管理対象の公開で止めた変更の公開、審査の取り下げは、Google Play の API に無い。Play Console で行う。
 
@@ -37,7 +37,9 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 
 ## 入れ方
 
-MCP サーバーは、PATH にある Node（24 以上）で動く。
+MCP サーバーは、Node 24 以上で動く。
+
+### サービスアカウントを用意する
 
 1. Google Cloud のコンソールでプロジェクトを選び、「Google Play Android Developer API」と「Google Play Developer Reporting API」を有効にする。サービスアカウントを作り、JSON 鍵をダウンロードする
 2. JSON 鍵を、好きな場所（例: `~/.config/gpc-mcp/service-account.json`）に置き、`chmod 600` で自分だけが読めるようにする
@@ -46,18 +48,58 @@ MCP サーバーは、PATH にある Node（24 以上）で動く。
    - 製品版としてのリリース、デバイスの除外、Play アプリ署名の使用
    - テストトラックへのアプリのリリース
    - ストアでの表示の管理
-4. Claude Code で、次を打つ
+
+### Claude Code
+
+1. Claude Code で、次を打つ
 
    ```
    /plugin marketplace add iHideck/gpc-mcp
    /plugin install gpc-mcp@gpc-mcp
    ```
 
-5. 設定の画面で、JSON 鍵のパスを入れる。あとから直すときは、`/plugin configure gpc-mcp@gpc-mcp` を打つ
+2. 設定の画面で、JSON 鍵のパスを入れる。あとから直すときは、`/plugin configure gpc-mcp@gpc-mcp` を打つ
+
+プラグインは、PATH にある Node で MCP サーバーを動かす。
+
+### ほかの MCP クライアント
+
+Claude Desktop・Cursor などでは、`npx` でサーバーを動かす。クライアントの MCP の設定（Claude Desktop は `claude_desktop_config.json`、Cursor は `~/.cursor/mcp.json` など）に、次のサーバーを足す。
+
+```json
+{
+  "mcpServers": {
+    "gpc": {
+      "command": "npx",
+      "args": ["-y", "@ihideck/gpc-mcp"],
+      "env": {
+        "GPC_SERVICE_ACCOUNT_KEY": "/Users/you/.config/gpc-mcp/service-account.json"
+      }
+    }
+  }
+}
+```
+
+ソースから動かすときは、リポジトリを clone して依存を入れる。
+
+```sh
+git clone https://github.com/iHideck/gpc-mcp.git
+cd gpc-mcp
+npm ci --prefix plugin
+```
+
+上の設定の `"command"` を `"node"` に、`"args"` を `["/absolute/path/to/gpc-mcp/plugin/src/index.ts"]` にする。
+
+Claude Code の外では、次のことに気を付ける。
+
+- `GPC_SERVICE_ACCOUNT_KEY` には、絶対パスか `~/` で始まるパスを入れる
+- Claude Code は、Google Play に変更を送るツールを呼ぶたびに確認を出す。ほかのクライアントは出さないことがある。`save_draft`・`submit_for_review`・`set_phased_release`・`set_data_safety` を承認制にするよう、クライアントを設定する
+- まだ送っていない変更は、サーバーが動いている間だけ残る
+- リリースのスキルは読み込まれない。使うときは、[`plugin/skills/release/SKILL.md`](plugin/skills/release/SKILL.md) の手順をクライアントに渡す
 
 ## 開発
 
-プラグインは `plugin/` にある。Claude Code がプラグインと一緒に入れるのは、`plugin/package.json` の依存だけ。ESLint などの開発の道具は、ルートの `package.json` に置く。
+プラグインは `plugin/` にある。Claude Code がプラグインと一緒に入れるのは、`plugin/package.json` の依存だけ。ESLint などの開発の道具は、ルートの `package.json` に置く。npm のパッケージ `@ihideck/gpc-mcp` も、`plugin/` から出す。
 
 | コマンド | すること |
 | :- | :- |
@@ -66,7 +108,10 @@ MCP サーバーは、PATH にある Node（24 以上）で動く。
 | `make download-discovery` | Google がいま配っている API の仕様を、`.local/` に落とし直す |
 | `make validate-plugin` | プラグインとマーケットプレイスの設定を検査する |
 | `make run-claude` | 手元のソースの MCP サーバーをつないで、Claude Code を起動する |
+| `make pack-npm` | npm のパッケージを `.local/` に作り、`npx` でそこからサーバーが起動するかを確かめる |
 
 テストは、送るリクエストのパス・引数・値が、API の仕様にあるかを確かめる。CI は毎回、Google がいま配っている仕様を落として照らす。
 
 手元のソースを本物の API で試すときは、JSON 鍵のパスを環境変数 `GPC_SERVICE_ACCOUNT_KEY` に入れてから、`make run-claude` を打つ。プラグインの設定は、`claude --plugin-dir` で読んだプラグインには渡らない。このとき、書くツールは Google Play を変えず、送るはずだったリクエストをエラーで返す。本当に書いて試すときは、`GPC_READ_ONLY=0` も入れる。
+
+npm に出すときは、`plugin/` で `npm publish` を打つ。Node は `node_modules` の中の TypeScript を動かせないので、`prepack` が `plugin/src/` を JavaScript にして `plugin/dist/` に置く。Claude Code のプラグインは、`plugin/src/index.ts` をそのまま動かす。
