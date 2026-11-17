@@ -2,6 +2,10 @@ name: CI
 
 on:
   pull_request:
+  # Google が API の仕様を変えたことに気付けるよう、そのつど落とした仕様と照らす検査を定期でも流す
+  schedule:
+    - cron: '0 0 1,15 * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
