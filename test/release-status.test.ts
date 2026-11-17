@@ -105,7 +105,7 @@ describe('getReleaseStatus', () => {
     const status = await getReleaseStatus(play, PACKAGE);
 
     expect(status.tracks[0]?.review).toBeNull();
-    expect(status.warnings).toEqual(['production の審査の状態を読めませんでした（403）。']);
+    expect(status.warnings).toEqual(['Cannot read the review state of production (403).']);
   });
 
   it('同時に呼んでも、edit を順番に作るので、互いに無効にしない', async () => {

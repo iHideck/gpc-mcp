@@ -71,7 +71,7 @@ export async function getLocalizations(
     const unknown = (locales ?? []).filter((locale) => !known.has(locale));
     if (unknown.length > 0) {
       throw new Error(
-        `言語 ${unknown.join('、')} の文はありません。ある言語は ${[...known].join('、')} です。`,
+        `No store listing for ${unknown.join(', ')}. Existing languages: ${[...known].join(', ')}.`,
       );
     }
     const wanted = (locale: string) => locales === undefined || locales.includes(locale);

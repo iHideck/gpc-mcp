@@ -67,7 +67,7 @@ describe('Google の API のエラー', () => {
     });
 
     await expect(listApps(client)).rejects.toThrow(
-      /API を有効にしてください。https:\/\/console\.developers\.google\.com\/apis\/api\/x/,
+      /Enable this API in your Google Cloud project\. https:\/\/console\.developers\.google\.com\/apis\/api\/x/,
     );
   });
 
@@ -78,7 +78,9 @@ describe('Google の API のエラー', () => {
       status: 'PERMISSION_DENIED',
     });
 
-    await expect(listApps(client)).rejects.toThrow(/ユーザーと権限[\s\S]*does not have permission/);
+    await expect(listApps(client)).rejects.toThrow(
+      /Users and permissions[\s\S]*does not have permission/,
+    );
   });
 
   it('エラーの理由を、古い形と新しい形のどちらからも読む', async () => {

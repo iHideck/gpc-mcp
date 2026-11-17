@@ -128,7 +128,7 @@ describe('getLocalizations', () => {
 
     await expect(
       getLocalizations(play, { packageName: PACKAGE, track: 'production', locales: ['ja'] }),
-    ).rejects.toThrow('言語 ja の文はありません。ある言語は ja-JP、en-US です。');
+    ).rejects.toThrow('No store listing for ja. Existing languages: ja-JP, en-US.');
   });
 
   it('無いトラックを渡すと、リリースノートは null', async () => {

@@ -106,7 +106,7 @@ function createEdits(client: GpcClient, store: PendingStore): Edits {
       throw error instanceof GpcApiError && error.status === 404
         ? new GpcApiError(
             404,
-            `${packageName} のアプリが見つかりません。次を確かめてください。\n- パッケージ名が合っているか\n- Play Console の [ユーザーと権限] で、サービスアカウントにこのアプリの権限を与えたか（権限が無くても 404 になります）\n- ビルドを1つでも上げたか（ビルドの無いアプリは API で扱えないので、最初の App Bundle は Play Console で上げてください）\n${error.message}`,
+            `App ${packageName} was not found. Check the following:\n- The package name is correct.\n- In Play Console, under Users and permissions, the service account has permissions for this app. Without them, the API also returns 404.\n- The app has at least one build. The API cannot handle an app with no builds, so upload the first App Bundle in Play Console.\n${error.message}`,
             error.reasons,
           )
         : error;
@@ -243,7 +243,7 @@ function createEdits(client: GpcClient, store: PendingStore): Edits {
         );
         if (busy.length > 0) {
           throw new Error(
-            `${busy.join('・')} にまだ送っていない変更があるので、別のアプリから写せません（別のアプリの edit を作ると、変更が無効になることがあります）。先に送るか、discard_changes で捨ててください。`,
+            `${busy.join(', ')} has unsent changes, so the contact details cannot be copied from another app. Creating an edit for another app can invalidate unsent changes. First send them, or discard them with discard_changes.`,
           );
         }
         const value = await readApp(otherPackage, read);
@@ -293,19 +293,19 @@ function withCommitHint(error: GpcApiError): GpcApiError {
 
 function commitHint(error: GpcApiError): string | undefined {
   if (error.reasons.includes('CHANGES_ALREADY_IN_REVIEW')) {
-    return '審査中の変更があるので、送りませんでした。審査が終わるのを待つか、cancelChangesInReview: true で審査中の変更を取り下げて送ってください。';
+    return 'Nothing was sent because some changes are in review. Wait for the review to finish, or pass cancelChangesInReview: true to withdraw the changes in review and send.';
   }
   if (error.message.includes('changesNotSentForReview to true')) {
-    return 'このアプリの変更は、自動では審査に送れません（却下のあとなど）。notSentForReview: true で保存し、Play Console の [公開の概要] の [審査に送信] で送ってください。';
+    return 'Changes to this app cannot be sent for review automatically, for example after a rejection. Save them with notSentForReview: true, then go to Publishing overview in Play Console and click Send for review.';
   }
   if (error.message.includes('changesNotSentForReview must not be set')) {
-    return 'このアプリの変更は、自動で審査に送られます。notSentForReview を外してください。';
+    return 'Changes to this app are sent for review automatically. Remove notSentForReview.';
   }
   return undefined;
 }
 
 function uncertainOf(description: string): string {
-  return `${description}（届いたかは分かりません）`;
+  return `${description} (unknown whether it reached Google Play)`;
 }
 
 function mayHaveArrived(error: unknown): boolean {
@@ -323,9 +323,9 @@ export function isGone(error: unknown): boolean {
 function lostError(pending: Pending, cause: unknown): Error {
   return new Error(
     [
-      'まだ送っていない変更が、Google Play で無効になりました（有効期限が切れた、Play Console で別の変更をした、別のアプリを操作した、ほかの場所で edit を作ったかコミットしたなど）。',
-      ...(pending.changes.length === 0 ? [] : [`失われた変更: ${pending.changes.join('、')}。`]),
-      '必要なら入れ直してください。前の呼び出しで送っている途中だったなら、送り終えているかもしれません。get_release_status で確かめてください。',
+      'The unsent changes are no longer valid in Google Play. For example, they expired, someone changed the app in Play Console, you worked on another app, or an edit was created or committed elsewhere.',
+      ...(pending.changes.length === 0 ? [] : [`Lost changes: ${pending.changes.join(', ')}.`]),
+      'Make the changes again if you need them. If a previous call was sending them, they may have been sent. Check with get_release_status.',
     ].join('\n'),
     { cause },
   );

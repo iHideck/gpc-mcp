@@ -55,7 +55,7 @@ export async function setTesters(
     const after = same
       ? before
       : ((
-          await edit.change(`${track} のテスターの Google グループを変えた`, () =>
+          await edit.change(`Changed the tester Google Groups on ${track}`, () =>
             client.put(testersPath(edit, track), { googleGroups: wanted }, Testers),
           )
         ).googleGroups ?? []);

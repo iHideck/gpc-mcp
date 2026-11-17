@@ -18,7 +18,7 @@ export class ConfigError extends Error {
 }
 
 const SETUP_HINT =
-  '/plugin configure gpc-mcp@gpc-mcp でサービスアカウントの鍵のファイルを入れてから、Claude Code を起動し直してください。';
+  'In Claude Code, run /plugin configure gpc-mcp@gpc-mcp and enter the path of the service account key file, then restart Claude Code. In other MCP clients, set the GPC_SERVICE_ACCOUNT_KEY environment variable, then restart the client.';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPES = [
@@ -49,11 +49,11 @@ export async function loadCredentials(
 ): Promise<Credentials> {
   const configured = env.GPC_SERVICE_ACCOUNT_KEY;
   if (configured === undefined || configured === '' || configured.includes('${')) {
-    throw new ConfigError(`サービスアカウントの鍵のファイルが、設定されていません。${SETUP_HINT}`);
+    throw new ConfigError(`The service account key file is not set. ${SETUP_HINT}`);
   }
   const path = expandHome(configured, home);
   if (!isAbsolute(path)) {
-    throw new ConfigError(`鍵のファイルは、絶対パスで入れてください: ${configured}。${SETUP_HINT}`);
+    throw new ConfigError(`Set the key file as an absolute path: ${configured}. ${SETUP_HINT}`);
   }
 
   let text: string;
@@ -61,13 +61,13 @@ export async function loadCredentials(
     text = await readFile(path, 'utf8');
   } catch {
     throw new ConfigError(
-      `鍵のファイル ${path} を読めません。Google Cloud でダウンロードした JSON 鍵のファイルを、このパスに置いてください。`,
+      `Cannot read the key file ${path}. Put the JSON key file that you downloaded from Google Cloud at this path.`,
     );
   }
   const key = ServiceAccountKey.safeParse(parseJson(text));
   if (!key.success) {
     throw new ConfigError(
-      `${path} を、サービスアカウントの JSON 鍵として読めません。Google Cloud でダウンロードしたファイルかを確かめてください。`,
+      `Cannot read ${path} as a service account JSON key. Check that it is the file you downloaded from Google Cloud.`,
     );
   }
   let privateKey: KeyObject;
@@ -75,7 +75,7 @@ export async function loadCredentials(
     privateKey = createPrivateKey(key.data.private_key);
   } catch {
     throw new ConfigError(
-      `${path} の秘密鍵を読めません。Google Cloud でダウンロードしたファイルかを確かめてください。`,
+      `Cannot read the private key in ${path}. Check that it is the file you downloaded from Google Cloud.`,
     );
   }
   return {
@@ -131,7 +131,7 @@ async function requestToken(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {
-    throw new Error(`Google のトークンの発行先に接続できませんでした（${reasonOf(error)}）。`, {
+    throw new Error(`Cannot connect to the Google token endpoint (${reasonOf(error)}).`, {
       cause: error,
     });
   }
@@ -140,7 +140,7 @@ async function requestToken(
     const { error, error_description: description } = TokenError.safeParse(body).data ?? {};
     throw new ConfigError(
       [
-        `Google がトークンを発行しませんでした（${response.status}）。サービスアカウントと鍵が Google Cloud で有効かを確かめてください。`,
+        `Google did not issue a token (${response.status}). Check that the service account and its key are valid in Google Cloud.`,
         [error, description].filter(Boolean).join(': '),
       ]
         .filter(Boolean)
@@ -149,7 +149,7 @@ async function requestToken(
   }
   const token = TokenResponse.safeParse(body);
   if (!token.success) {
-    throw new Error('Google のトークンの応答が、思っていた形と違います。');
+    throw new Error('The token response from Google has an unexpected shape.');
   }
   return { value: token.data.access_token, expiresAt: issuedAt + token.data.expires_in };
 }

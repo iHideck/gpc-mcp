@@ -57,11 +57,11 @@ function json(value: unknown) {
 }
 
 const appArguments = {
-  packageName: z.string().min(1).describe('アプリのパッケージ名（例: com.ihideck.machosterone）'),
+  packageName: z.string().min(1).describe('Package name of the app, for example com.example.myapp'),
 };
 
 const TRACK_DESCRIPTION =
-  'トラックの名前。production（製品版）・beta（オープンテスト）・alpha（クローズドテストの既定）・internal（内部テスト）か、Play Console で作ったクローズドテストの名前';
+  'Track name: production, beta (open testing), alpha (the default closed testing track), internal (internal testing), or the name of a closed testing track created in Play Console';
 
 const trackArgument = z.string().min(1).default(DEFAULT_TRACK).describe(TRACK_DESCRIPTION);
 
@@ -72,14 +72,14 @@ const notSentForReviewArgument = z
   .boolean()
   .optional()
   .describe(
-    'Google が審査に自動で送れない状態（却下のあとなど）のときに true にする。保存だけして、Play Console の [公開の概要] の [審査に送信] で送る',
+    'Set to true when Google cannot send the changes for review automatically, for example after a rejection. The changes are only saved; send them with Send for review on the Publishing overview page in Play Console',
   );
 
 const cancelChangesInReviewArgument = z
   .boolean()
   .optional()
   .describe(
-    '審査中の変更があるときに、それを取り下げてから送るなら true。省くと、審査中の変更があれば送らない',
+    'Set to true to withdraw changes that are in review, then send. If omitted, nothing is sent while changes are in review',
   );
 
 const userFractionArgument = z.number().gt(0).lt(1);
@@ -92,9 +92,9 @@ const server = new McpServer({ name: 'gpc-mcp', version: packageJson.version });
 server.registerTool(
   'list_apps',
   {
-    title: 'アプリの一覧',
+    title: 'List apps',
     description:
-      'Google Play Console にあるアプリの、名前とパッケージ名を返す。Play Console の [ユーザーと権限] でサービスアカウントにアプリの権限を与えていないと、空の一覧になる。',
+      'Returns the name and package name of each app in Google Play Console. The list is empty unless the service account has permissions for the apps under Users and permissions in Play Console.',
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   async () => json({ apps: await listApps((await getPlay()).client) }),
@@ -103,9 +103,9 @@ server.registerTool(
 server.registerTool(
   'get_release_status',
   {
-    title: 'リリースの状態',
+    title: 'Get release status',
     description:
-      '新しい順に5つのビルドと、リリースのあるトラックごとのリリース（名前・状態・ビルド・段階的公開の割合）と審査の状態（review。読めなければ null）を返す。まだ送っていない変更（pending）があれば、それも入った状態を返す。',
+      'Returns the five newest builds, the releases on each track that has releases (name, status, builds, and staged rollout percentage), and the review state (review, or null if it cannot be read). If there are unsent changes (pending), the result includes them.',
     inputSchema: z.object(appArguments),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -115,9 +115,9 @@ server.registerTool(
 server.registerTool(
   'get_localizations',
   {
-    title: '掲載の文',
+    title: 'Get store listings',
     description:
-      'ストアの掲載情報の、言語ごとの文（タイトル・簡単な説明・詳しい説明・動画の URL）と、既定の言語と、トラックのリリースノート（下書きのリリースがあればそれ、なければ新しいリリース）を返す。言語が多くて出力が大きいときは、locales で絞る。',
+      'Returns the store listing text for each language (title, short description, full description, and video URL), the default language, and the release notes of the track (from the draft release if there is one, otherwise from the newest release). If there are many languages and the output is large, narrow it with locales.',
     inputSchema: z.object({
       ...appArguments,
       track: trackArgument,
@@ -125,7 +125,9 @@ server.registerTool(
         .array(z.string().min(1))
         .min(1)
         .optional()
-        .describe('読む言語（例: ["ja-JP", "en-US"]）。省くと、すべての言語を読む'),
+        .describe(
+          'Languages to read, for example ["en-US", "ja-JP"]. If omitted, all languages are read',
+        ),
     }),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -135,9 +137,9 @@ server.registerTool(
 server.registerTool(
   'get_availability',
   {
-    title: '配信する国',
+    title: 'Get availability',
     description:
-      'トラックの配信する国（2文字の国コード）と、その他の国に配信するか（restOfWorld）、製品版と同じ設定か（syncWithProduction）を返す。配信する国は API では変えられないので、変えるときは Play Console で行う。',
+      'Returns the countries where the track is available (two-letter country codes), whether it is available in the rest of the world (restOfWorld), and whether it uses the same settings as production (syncWithProduction). The API cannot change countries; change them in Play Console.',
     inputSchema: z.object({ ...appArguments, track: trackArgument }),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -147,16 +149,16 @@ server.registerTool(
 server.registerTool(
   'create_track',
   {
-    title: 'クローズドテストのトラックを作る',
+    title: 'Create closed testing track',
     description:
-      'クローズドテストのトラックを作る。もうあれば何もしない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。作ったかどうか（created）を返す。',
+      'Creates a closed testing track. Does nothing if the track exists. Writes to the unsent changes only; Google Play receives nothing until submit_for_review or save_draft runs. Returns whether the track was created (created).',
     inputSchema: z.object({
       ...appArguments,
       track: z
         .string()
         .min(1)
         .describe(
-          '新しいトラックの名前。Wear OS と Automotive OS のトラックは、wear: と automotive: で始める',
+          'Name of the new track. Start Wear OS and Automotive OS track names with wear: and automotive:',
         ),
     }),
     annotations: {
@@ -172,9 +174,9 @@ server.registerTool(
 server.registerTool(
   'get_testers',
   {
-    title: 'テスターのグループ',
+    title: 'Get testers',
     description:
-      'テストのトラックの、テスターの Google グループを返す。Play Console で入れたメールのリストは、API では読めない。',
+      'Returns the Google Groups of testers for a testing track. The API cannot read email lists added in Play Console.',
     inputSchema: z.object({ ...appArguments, track: requiredTrackArgument }),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -184,15 +186,17 @@ server.registerTool(
 server.registerTool(
   'set_testers',
   {
-    title: 'テスターのグループを入れる',
+    title: 'Set testers',
     description:
-      'テストのトラックの、テスターの Google グループを、渡したものに置き換える。メールのリストは API では変えられない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。変える前と後を返す。',
+      'Replaces the Google Groups of testers for a testing track with the ones you pass. The API cannot change email lists. Writes to the unsent changes only; Google Play receives nothing until submit_for_review or save_draft runs. Returns the groups before and after.',
     inputSchema: z.object({
       ...appArguments,
       track: requiredTrackArgument,
       googleGroups: z
         .array(z.email())
-        .describe('テスターの Google グループのメールアドレス。空にすると全部外す'),
+        .describe(
+          'Email addresses of the tester Google Groups. Pass an empty array to remove all of them',
+        ),
     }),
     annotations: {
       readOnlyHint: false,
@@ -207,12 +211,12 @@ server.registerTool(
 server.registerTool(
   'upload_bundle',
   {
-    title: 'App Bundle を上げる',
+    title: 'Upload App Bundle',
     description:
-      'App Bundle（.aab）を、まだ送っていない変更に上げる。同じファイル（SHA-256 が同じもの）がもうあれば、上げ直さない。アプリの最初のビルドは、API では上げられないので Play Console で上げる。上げたビルドの versionCode と、まだ送っていない変更（pending）を返す。',
+      'Uploads an App Bundle (.aab) to the unsent changes. Does not upload it again if the same file (same SHA-256) is already there. The API cannot upload the first build of an app; upload it in Play Console. Returns the versionCode of the build and the unsent changes (pending).',
     inputSchema: z.object({
       ...appArguments,
-      file: z.string().min(1).describe('App Bundle のファイルの絶対パス'),
+      file: z.string().min(1).describe('Absolute path of the App Bundle file'),
     }),
     annotations: {
       readOnlyHint: false,
@@ -227,18 +231,18 @@ server.registerTool(
 server.registerTool(
   'select_build',
   {
-    title: 'ビルドを選ぶ',
+    title: 'Select build',
     description:
-      'トラックの下書きのリリースに、ビルドを選ぶ。下書きが無ければ作る。リリースの名前は、省くと Google がビルドの版から付ける。公開中のリリースは変えない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。選ぶ前と後の下書きと、まだ送っていない変更（pending）を返す。',
+      'Selects a build for the draft release on the track. Creates the draft release if there is none. If the release name is omitted, Google names it from the build version. Does not change live releases. Writes to the unsent changes only; Google Play receives nothing until submit_for_review or save_draft runs. Returns the draft before and after, and the unsent changes (pending).',
     inputSchema: z.object({
       ...appArguments,
       track: trackArgument,
-      versionCode: z.number().int().positive().describe('ビルドの versionCode（例: 12）'),
+      versionCode: z.number().int().positive().describe('versionCode of the build, for example 12'),
       releaseName: z
         .string()
         .min(1)
         .optional()
-        .describe('リリースの名前（例: 1.0.2）。省くと、下書きの名前を Google に任せる'),
+        .describe('Release name, for example 1.0.2. If omitted, Google names the draft'),
     }),
     annotations: {
       readOnlyHint: false,
@@ -253,16 +257,16 @@ server.registerTool(
 server.registerTool(
   'set_localizations',
   {
-    title: '掲載の文を入れる',
+    title: 'Set store listings',
     description:
-      'ストアの掲載情報（タイトル・簡単な説明・詳しい説明・動画の URL）と、トラックの下書きのリリースのリリースノートを、言語ごとに入れる。渡した項目だけを変える。入れる前に上限の文字数と URL の形を確かめ、1つでも合わなければ何も変えない。掲載情報が無い言語は、タイトル・簡単な説明・詳しい説明を全部渡すと新しく作る。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。変えた項目の前と後と、気を付けること（warnings）を返す。',
+      'Sets the store listing (title, short description, full description, and video URL) and the release notes of the draft release on the track, for each language. Changes only the fields you pass. Checks character limits and URL formats first, and changes nothing if any check fails. For a language with no store listing, creates one when you pass the title, short description, and full description. Writes to the unsent changes only; Google Play receives nothing until submit_for_review or save_draft runs. Returns each changed field before and after, and warnings.',
     inputSchema: z.object({
       ...appArguments,
       track: trackArgument,
       localizations: z
         .array(localizationInput)
         .min(1)
-        .describe('言語ごとの文。渡さない項目は変えない'),
+        .describe('Text for each language. Fields you omit are not changed'),
     }),
     annotations: {
       readOnlyHint: false,
@@ -277,22 +281,22 @@ server.registerTool(
 server.registerTool(
   'replace_screenshots',
   {
-    title: '画面写真を入れ替える',
+    title: 'Replace screenshots',
     description:
-      '1つの言語の1つの種類（imageType）の画像を、渡したファイルに入れ替え、渡した順に並べる。画面写真のほか、アイコン・フィーチャーグラフィック・TV のバナーも入れられる。送る前に、全部のファイルが PNG か JPEG かと、大きさが規格に合うかを確かめ、1つでも合わなければ何も変えない。同じ画像（SHA-256 が同じもの）が同じ順で入っていれば、何もしない。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。入れ替える前と後の画像の一覧と、気を付けること（warnings）を返す。',
+      'Replaces the images of one type (imageType) for one language with the files you pass, in the order you pass them. Handles screenshots, the app icon, the feature graphic, and the TV banner. Checks first that every file is a PNG or JPEG and meets the size requirements, and changes nothing if any check fails. Does nothing if the same images (same SHA-256) are already there in the same order. Writes to the unsent changes only; Google Play receives nothing until submit_for_review or save_draft runs. Returns the images before and after, and warnings.',
     inputSchema: z.object({
       ...appArguments,
-      locale: z.string().min(1).describe('画像を入れ替える言語（例: ja-JP）'),
+      locale: z.string().min(1).describe('Language of the images, for example en-US'),
       imageType: z.enum(IMAGE_TYPE_NAMES).describe(
-        `入れ替える画像の種類: ${Object.entries(IMAGE_TYPES)
-          .map(([name, { label }]) => `${name}（${label}）`)
-          .join('。')}`,
+        `Type of images to replace: ${Object.entries(IMAGE_TYPES)
+          .map(([name, { label }]) => `${name} (${label})`)
+          .join(', ')}`,
       ),
       files: z
         .array(z.string().min(1))
         .min(1)
         .max(MAX_IMAGE_FILES)
-        .describe('入れる画像（PNG か JPEG）のファイルの絶対パス。並べたい順に渡す'),
+        .describe('Absolute paths of the image files (PNG or JPEG), in display order'),
     }),
     annotations: {
       readOnlyHint: false,
@@ -307,29 +311,33 @@ server.registerTool(
 server.registerTool(
   'set_app_info',
   {
-    title: 'App の情報を入れる',
+    title: 'Set app details',
     description:
-      'ストアに出す連絡先（メール・電話・ウェブサイト）と、既定の言語を入れる。渡した項目だけを変える。まだ送っていない変更に入れるだけで、submit_for_review か save_draft を呼ぶまで Google Play には反映されない。sameAsApp を渡すと、ほかのアプリから連絡先を写す。カテゴリ・コンテンツのレーティングは API に無いので、Play Console で入れる。変える前と後と、写す元に無かった項目（missingInSource）を返す。',
+      'Sets the contact details shown in the store (email, phone, and website) and the default language. Changes only the fields you pass. Writes to the unsent changes only; Google Play receives nothing until submit_for_review or save_draft runs. With sameAsApp, copies the contact details from another app. The API has no category or content rating; set them in Play Console. Returns the details before and after, and the fields missing in the source app (missingInSource).',
     inputSchema: z.object({
       ...appArguments,
-      defaultLanguage: z.string().min(1).optional().describe('既定の言語（例: ja-JP）'),
-      contactEmail: z.email().optional().describe('ストアに出すメールアドレス'),
+      defaultLanguage: z.string().min(1).optional().describe('Default language, for example en-US'),
+      contactEmail: z.email().optional().describe('Contact email shown in the store'),
       contactPhone: z
         .string()
         .nullable()
         .optional()
-        .describe('ストアに出す電話番号。null か空の文字にすると消す。省くと変えない'),
+        .describe(
+          'Contact phone shown in the store. Pass null or an empty string to remove it. Omit to leave it unchanged',
+        ),
       contactWebsite: z
         .string()
         .nullable()
         .optional()
-        .describe('ストアに出すウェブサイト。null か空の文字にすると消す。省くと変えない'),
+        .describe(
+          'Contact website shown in the store. Pass null or an empty string to remove it. Omit to leave it unchanged',
+        ),
       sameAsApp: z
         .string()
         .min(1)
         .optional()
         .describe(
-          '連絡先（メール・電話・ウェブサイト）を写す元のアプリのパッケージ名。渡した項目は、写す元より優先する。まだ送っていない変更があるときは使えない',
+          'Package name of the app to copy the contact details (email, phone, and website) from. Fields you pass take precedence over the copied ones. Cannot be used while there are unsent changes',
         ),
     }),
     annotations: {
@@ -345,12 +353,12 @@ server.registerTool(
 server.registerTool(
   'set_data_safety',
   {
-    title: 'データセーフティを入れる',
+    title: 'Set Data safety',
     description:
-      'データセーフティの申告を、CSV で入れる。CSV は Play Console のデータセーフティの画面から書き出せる形にする。まだ送っていない変更には入らず、呼ぶとすぐ Google Play に届く。申告を上書きする。呼ぶたびに、利用者の確認が要る。',
+      'Writes the Data safety declaration from a CSV file in the format that the Data safety page in Play Console exports. This does not go to the unsent changes; Google Play receives it immediately. Overwrites the declaration. Each call requires user confirmation.',
     inputSchema: z.object({
       ...appArguments,
-      file: z.string().min(1).describe('CSV のファイルの絶対パス'),
+      file: z.string().min(1).describe('Absolute path of the CSV file'),
     }),
     annotations: {
       readOnlyHint: false,
@@ -366,9 +374,9 @@ server.registerTool(
 server.registerTool(
   'validate_changes',
   {
-    title: 'まだ送っていない変更を確かめる',
+    title: 'Validate unsent changes',
     description:
-      'まだ送っていない変更（pending）を、Google の検査に通す。Google Play には何も送らない。問題なければ valid が true、問題があれば valid が false で problem に理由を返す。まだ送っていない変更が無ければ valid は null。',
+      'Runs the unsent changes (pending) through Google checks. Sends nothing to Google Play. Returns valid: true if there are no problems, or valid: false with the reason in problem. valid is null if there are no unsent changes.',
     inputSchema: z.object(appArguments),
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -378,9 +386,9 @@ server.registerTool(
 server.registerTool(
   'save_draft',
   {
-    title: '下書きのまま保存する',
+    title: 'Save draft',
     description:
-      'まだ送っていない変更（pending）を、Google Play に保存する。リリースは下書きのまま残る。公開したことのないアプリは API では審査に出せないので、これで保存してから Play Console で審査に出す。掲載の文と画像の変更は、公開済みのアプリでは、保存すると Google の審査に送られる。審査中の変更があれば送らない。呼ぶたびに、利用者の確認が要る。保存した変更を返す。',
+      'Saves the unsent changes (pending) to Google Play and keeps releases as drafts. The API cannot send an app that has never been published for review, so save with this tool, then send it for review in Play Console. For a published app, saved store listing and image changes are sent to Google for review. Sends nothing while changes are in review. Each call requires user confirmation. Returns the saved changes.',
     inputSchema: z.object({
       ...appArguments,
       cancelChangesInReview: cancelChangesInReviewArgument,
@@ -400,24 +408,28 @@ server.registerTool(
 server.registerTool(
   'submit_for_review',
   {
-    title: '審査に出す',
+    title: 'Submit for review',
     description:
-      'トラックの下書きのリリースと、まだ送っていない変更（掲載の文・画像など）を、Google Play に送る。審査のあるトラックでは審査に出す。内部テスト（internal）は審査なしですぐ配信される。審査が通ると、管理対象の公開を切っていれば自動で公開される。userFraction を渡すと段階的公開にする。省くと全員に出す。下書きが無くても、掲載の文などの変更があれば、それを送る。審査中の変更があれば送らない。呼ぶたびに、利用者の確認が要る。送ったリリースの前と後、送った変更、審査の状態、気を付けること（warnings）を返す。',
+      'Sends the draft release on the track and the unsent changes (store listings, images, and so on) to Google Play. On tracks with review, submits them for review. The internal track has no review and is available right away. After approval, the release is published automatically unless managed publishing is on. With userFraction, starts a staged rollout; without it, releases to all users. If there is no draft release, sends other unsent changes such as store listings. Sends nothing while changes are in review. Each call requires user confirmation. Returns the release before and after, the sent changes, the review state, and warnings.',
     inputSchema: z.object({
       ...appArguments,
       track: requiredTrackArgument,
       userFraction: userFractionArgument
         .optional()
-        .describe('段階的公開で配る割合（0 より大きく 1 より小さい。例: 0.2）'),
+        .describe(
+          'Fraction of users for a staged rollout, greater than 0 and less than 1, for example 0.2',
+        ),
       countries: z
-        .array(z.string().regex(/^[A-Z]{2}$/, '国は JP・US のような2文字のコードです'))
+        .array(z.string().regex(/^[A-Z]{2}$/, 'Use two-letter country codes such as US or JP'))
         .min(1)
         .optional()
-        .describe('段階的公開を配る国（例: ["JP", "US"]）。製品版の段階的公開だけで使える'),
+        .describe(
+          'Countries for the staged rollout, for example ["US", "JP"]. Only for a staged rollout on the production track',
+        ),
       includeRestOfWorld: z
         .boolean()
         .optional()
-        .describe('countries のほかの国にも配るか。省くと配らない'),
+        .describe('Whether to also release to countries not in countries. If omitted, it does not'),
       cancelChangesInReview: cancelChangesInReviewArgument,
       notSentForReview: notSentForReviewArgument,
     }),
@@ -435,20 +447,20 @@ server.registerTool(
 server.registerTool(
   'set_phased_release',
   {
-    title: '段階的公開を変える',
+    title: 'Change staged rollout',
     description:
-      '進めている段階的公開を、止める（pause）・再開する（resume）・割合を変える（update）・全員に出す（complete）。段階的公開が無いときの pause は、全員に出したリリースを止める。新しく入れる人と更新する人には、その前の全員向けのリリースが配られ、もう入れた人はそのまま（前のリリースが無ければ Google が断る）。全員に出すと、元に戻せない。もうその状態なら、そのまま返す。まだ送っていない変更（pending）があるときは、一緒に送られないように変えない。審査中の変更があれば送らない。呼ぶたびに、利用者の確認が要る。変える前と後を返す。',
+      'Pauses (pause), resumes (resume), changes the percentage of (update), or completes (complete) a staged rollout. With no staged rollout, pause halts the release to all users: new installs and updates get the previous release to all users, and users who already installed it keep it (Google rejects this if there is no previous release). Completing cannot be undone. If the release is already in the requested state, returns it unchanged. Does nothing while there are unsent changes (pending), so that they are not sent with it. Sends nothing while changes are in review. Each call requires user confirmation. Returns the release before and after.',
     inputSchema: z.object({
       ...appArguments,
       track: requiredTrackArgument,
       action: z
         .enum(PHASED_RELEASE_ACTIONS)
         .describe(
-          'pause は止める、resume は再開する（userFraction を渡すと割合も変える）、update は進めている段階的公開の割合を変える（userFraction が要る）、complete は全員に出す',
+          'pause halts the rollout. resume restarts it (with userFraction, also changes the percentage). update changes the percentage of the active rollout (requires userFraction). complete releases to all users',
         ),
       userFraction: userFractionArgument
         .optional()
-        .describe('配る割合（0 より大きく 1 より小さい。例: 0.5）'),
+        .describe('Fraction of users, greater than 0 and less than 1, for example 0.5'),
       cancelChangesInReview: cancelChangesInReviewArgument,
       notSentForReview: notSentForReviewArgument,
     }),
@@ -466,9 +478,9 @@ server.registerTool(
 server.registerTool(
   'discard_changes',
   {
-    title: 'まだ送っていない変更を捨てる',
+    title: 'Discard unsent changes',
     description:
-      'まだ Google Play に送っていない変更（pending）を、すべて捨てる。上げた App Bundle も捨てられる。捨てた変更を返す。何も無ければ null を返す。',
+      'Discards all changes not yet sent to Google Play (pending), including uploaded App Bundles. Returns the discarded changes, or null if there were none.',
     inputSchema: z.object(appArguments),
     annotations: {
       readOnlyHint: false,

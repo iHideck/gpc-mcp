@@ -107,7 +107,7 @@ describe('まだ送っていない edit', () => {
     await addDraft(play);
     fake.changeInConsole();
 
-    await expect(statuses(play)).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
+    await expect(statuses(play)).rejects.toThrow(/no longer valid[\s\S]*下書きを足した/);
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
     expect(await statuses(play)).toEqual(['completed']);
@@ -122,7 +122,7 @@ describe('まだ送っていない edit', () => {
         fake.changeInConsole();
         await writeTrack(play.client, edit, 'production', [COMPLETED]);
       }),
-    ).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
+    ).rejects.toThrow(/no longer valid[\s\S]*下書きを足した/);
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
   });
@@ -139,7 +139,7 @@ describe('まだ送っていない edit', () => {
     const play = createPlay(createClient(async () => 'TOKEN', fake.fetch));
 
     await expect(statuses(play)).rejects.toThrow(
-      /ユーザーと権限[\s\S]*最初の App Bundle は Play Console で上げて[\s\S]*not found/,
+      /Users and permissions[\s\S]*upload the first App Bundle in Play Console[\s\S]*not found/,
     );
   });
 
@@ -154,10 +154,10 @@ describe('まだ送っていない edit', () => {
       return response;
     });
 
-    await expect(addDraft(play)).rejects.toThrow('届いたかは分かりません');
+    await expect(addDraft(play)).rejects.toThrow('unknown whether');
 
     expect(play.edits.pending(PACKAGE)?.changes).toEqual([
-      '下書きを足した（届いたかは分かりません）',
+      '下書きを足した (unknown whether it reached Google Play)',
     ]);
     expect(fake.openEdits()).toHaveLength(1);
   });
@@ -174,7 +174,7 @@ describe('まだ送っていない edit', () => {
     await expect(addDraft(play)).rejects.toThrow('503');
 
     expect(play.edits.pending(PACKAGE)?.changes).toEqual([
-      '下書きを足した（届いたかは分かりません）',
+      '下書きを足した (unknown whether it reached Google Play)',
     ]);
   });
 
@@ -197,7 +197,7 @@ describe('まだ送っていない edit', () => {
     const fake = fakePlay({ tracks: { production: [COMPLETED] } });
     const play = createPlay(createClient(async () => 'TOKEN', fake.fetch, true));
 
-    await expect(addDraft(play)).rejects.toThrow('送りませんでした');
+    await expect(addDraft(play)).rejects.toThrow('was not sent');
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
     expect(fake.openEdits()).toEqual([]);
@@ -254,7 +254,7 @@ describe('まだ送っていない edit', () => {
 
     await expect(
       play.edits.read(PACKAGE, (edit) => readTrack(play.client, edit, 'production')),
-    ).rejects.toThrow('無効になりました');
+    ).rejects.toThrow('no longer valid');
 
     expect(play.edits.pending(PACKAGE)).toBeNull();
     expect(fake.openEdits()).toHaveLength(1);
@@ -298,7 +298,7 @@ describe('まだ送っていない edit', () => {
 
     const restarted = createPlay(client, store);
 
-    await expect(statuses(restarted)).rejects.toThrow(/無効になりました[\s\S]*下書きを足した/);
+    await expect(statuses(restarted)).rejects.toThrow(/no longer valid[\s\S]*下書きを足した/);
     expect(await store.get(PACKAGE)).toBeUndefined();
     expect(await statuses(restarted)).toEqual(['completed']);
   });

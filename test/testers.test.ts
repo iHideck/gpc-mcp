@@ -44,7 +44,7 @@ describe('setTesters', () => {
 
     expect(result.before).toEqual(['old@googlegroups.com']);
     expect(result.after).toEqual(GROUPS);
-    expect(result.pending?.changes).toEqual(['alpha のテスターの Google グループを変えた']);
+    expect(result.pending?.changes).toEqual(['Changed the tester Google Groups on alpha']);
     expect(openSnapshot(fake)?.testers.alpha).toEqual(GROUPS);
     expect(fake.live.testers.alpha).toEqual(['old@googlegroups.com']);
   });

@@ -32,7 +32,10 @@ describe('uploadBundle', () => {
       packageName: PACKAGE,
       versionCode: 12,
       uploaded: true,
-      pending: { expiresAt: expect.any(String), changes: ['App Bundle app-release.aab を上げた'] },
+      pending: {
+        expiresAt: expect.any(String),
+        changes: ['Uploaded the App Bundle app-release.aab'],
+      },
     });
     expect(fake.live.bundles).toEqual([]);
     const [[id] = []] = fake.openEdits();
@@ -61,9 +64,9 @@ describe('uploadBundle', () => {
   });
 
   it.each([
-    ['絶対パスでない', 'app-release.aab', '絶対パス'],
+    ['絶対パスでない', 'app-release.aab', 'absolute path'],
     ['.aab でない', '/tmp/app-release.apk', '.aab'],
-    ['無い', '/nonexistent/app-release.aab', '読めません'],
+    ['無い', '/nonexistent/app-release.aab', 'Cannot read'],
   ])('ファイルのパスが%sときは、edit を作らない', async (_, file, message) => {
     const { fake, play } = setup();
 

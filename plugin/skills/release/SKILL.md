@@ -1,72 +1,72 @@
 ---
-description: Google Play へのリリース（次の版の準備・初めて出すアプリの設定・審査への提出・段階的公開）を、gpc-mcp のツールで進める。「Android の次の版を出したい」「Google Play に出したい」「画面写真を入れ替えて」「審査に出して」「段階的公開を止めて」などと頼まれたときに使う。
+description: Releases an app to Google Play with the gpc-mcp tools, from preparing the next version and setting up a new app to submitting for review and staged rollout. Use when asked things like "Release the next Android version", "Publish to Google Play", "Replace the screenshots", "Submit it for review", or "Pause the staged rollout".
 ---
 
-# Google Play へのリリース
+# Release to Google Play
 
-gpc-mcp のツールで、次の版の準備から公開までを進める。アプリのパッケージ名が分からなければ、`list_apps` で調べるか、アプリのリポジトリの `applicationId` を見る。
+Use the gpc-mcp tools to take the next version from preparation to release. If you do not know the package name of the app, find it with `list_apps` or read `applicationId` in the app repository.
 
-準備のツールは、「まだ送っていない変更」（`pending`）に入れるだけで、Google Play には何も届かない。`submit_for_review` と `save_draft` を呼ぶと、全部が一緒に届く。
+The preparation tools only write to the *unsent changes* (`pending`). Google Play receives nothing until you call `submit_for_review` or `save_draft`, which send everything together.
 
-- 「まだ送っていない変更」は、Claude Code を起動し直しても残る。有効期限（`pending.expiresAt`）が切れるか、Play Console で何かを変えると失われる。失われたら、ツールがエラーで知らせるので、入れ直す
-- 準備している間は、Play Console で変更しないよう、利用者に伝える
-- Google の文書では、1つのサービスアカウントで開ける edit は1つだけ。別のアプリを読んだり書いたりすると、まだ送っていない変更が失われることがある。1つのアプリを送り終えてから、次のアプリに進む
-- いらなくなったら、`discard_changes` で捨てる
+- Unsent changes stay across restarts of Claude Code. They are lost when they expire (`pending.expiresAt`) or when someone changes the app in Play Console. If they are lost, the tools report it in an error; make the changes again.
+- While you prepare a release, tell the user not to change the app in Play Console.
+- Google documents that a service account can have only one open edit. Reading or writing another app can make the unsent changes lost. Finish sending one app before you move to the next.
+- If you no longer need the unsent changes, discard them with `discard_changes`.
 
-外に出るツール（`submit_for_review`・`save_draft`・`set_phased_release`・`set_data_safety`）は、呼ぶたびに Claude Code が利用者に確認を出す。呼ぶ前に、何をするかを文で見せ、利用者がよいと言ってから呼ぶ。
+Claude Code asks the user for confirmation every time a tool that sends to Google Play (`submit_for_review`, `save_draft`, `set_phased_release`, `set_data_safety`) is called. Before you call one, explain in text what it will do, and call it only after the user agrees.
 
-## 1. いまの状態を見る
+## 1. Check the current state
 
-1. `get_release_status` で、ビルド・トラックごとのリリース・審査の状態（`review`）・まだ送っていない変更を読む
-2. 出すトラックと、出すビルド（`versionCode`）を決める。決まっていなければ、利用者に聞く
+1. Use `get_release_status` to read the builds, the releases on each track, the review state (`review`), and the unsent changes.
+2. Decide the track and the build (`versionCode`) to release. If they are not decided, ask the user.
 
-## 2. 版を用意する
+## 2. Prepare the version
 
-書くツールは、いまの状態と比べて差だけを変えるので、同じ呼び出しをやり直してよい。
+The tools that write compare with the current state and change only the difference, so you can safely repeat a call.
 
-1. まだビルドを上げていなければ、アプリのリポジトリの手順で App Bundle を作り（Flutter なら `flutter build appbundle`）、`upload_bundle` で上げる。アップロード鍵で署名したものだけが通る
-2. `select_build` で、トラックの下書きのリリースにビルドを選ぶ
-3. `get_localizations` でいまの文を読み、`set_localizations` で変える文を入れる。リリースノートは、全部の言語に入れる
-   - アプリのリポジトリに掲載の文の決まりや正本（`docs/release.md` など）があれば、それに従う
-   - 言語のコードは Google Play のもの（`ja-JP`・`en-US`・`zh-TW` など）。App Store のコードとは違う
-4. 画面写真を変えるときは、`replace_screenshots` で、言語と種類（`imageType`）ごとに入れ替える
-5. ストアに出す連絡先と既定の言語を変えるときは、`set_app_info` を呼ぶ。連絡先は `sameAsApp` でほかのアプリから写せる。まだ送っていない変更があると写せないので、最初に行う
-6. 各ツールの `warnings` を、利用者に伝える
+1. If the build is not uploaded yet, build an App Bundle as the app repository describes (for Flutter, `flutter build appbundle`) and upload it with `upload_bundle`. Only bundles signed with the upload key are accepted.
+2. Use `select_build` to select the build for the draft release on the track.
+3. Read the current text with `get_localizations`, and set the text to change with `set_localizations`. Set release notes for every language.
+   - If the app repository has rules or a source of truth for the store listing text (such as `docs/release.md`), follow it.
+   - Language codes are Google Play codes (`ja-JP`, `en-US`, `zh-TW`, and so on). They differ from App Store codes.
+4. To change screenshots, use `replace_screenshots` for each language and image type (`imageType`).
+5. To change the contact details shown in the store or the default language, call `set_app_info`. You can copy the contact details from another app with `sameAsApp`. This does not work while there are unsent changes, so do it first.
+6. Tell the user about the `warnings` that each tool returns.
 
-## 初めて出すアプリの設定
+## Set up a new app
 
-API でできないものがあるので、Play Console の画面と組み合わせる。
+The API cannot do everything, so combine it with Play Console.
 
-1. Play Console でアプリを作り、最初の App Bundle を上げる。API は、ビルドが1つもないアプリには使えない
-2. 2 の手順で、掲載の文と画像を入れる。掲載の文の言語は、必要な文を全部渡すと足せる
-3. `save_draft` で、下書きのまま保存する。公開したことのないアプリは、API では審査に出せない
-4. 次のものを、Play Console の画面で入れてもらう
-   - アプリのコンテンツの申告（プライバシー ポリシー・広告・アプリのアクセス権・コンテンツのレーティング・ターゲット ユーザーなど）
-   - データ セーフティは、Play Console から書き出せる形の CSV があれば、`set_data_safety` で入れられる。申告の中身は法的な約束なので、CSV の内容を利用者に確かめてもらってから呼ぶ
-   - カテゴリ・価格・配信する国
-5. Play Console の [公開の概要] の [審査に送信] で送ってもらう
+1. Create the app in Play Console and upload the first App Bundle there. The API cannot handle an app that has no builds.
+2. Set the store listing text and images as in step 2. You can add a store listing language by passing all of its required text.
+3. Save it as a draft with `save_draft`. The API cannot send an app that has never been published for review.
+4. Ask the user to fill in the following in Play Console:
+   - The App content declarations (privacy policy, ads, app access, content rating, target audience, and so on).
+   - Data safety can be set with `set_data_safety` if you have a CSV in the format that Play Console exports. The declaration is a legal commitment, so have the user check the CSV before you call it.
+   - The category, price, and countries.
+5. Ask the user to send it with **Send for review** on the **Publishing overview** page in Play Console.
 
-2023 年 11 月 13 日以降に作った個人のアカウントは、製品版に出す前に、12 人以上のテスターが 14 日間続けて参加したクローズドテストが要る。クローズドテストは `alpha` か、Play Console で作ったトラックに、同じ手順で出す。
+Personal developer accounts created on or after November 13, 2023 need a closed test with at least 12 testers who stay opted in for 14 days in a row before they can release to production. Release the closed test to `alpha` or a track created in Play Console, with the same steps.
 
-## 3. 審査に出す
+## 3. Submit for review
 
-1. `validate_changes` で、まだ送っていない変更を Google の検査に通す。`valid` が `false` なら、`problem` を直す
-2. 利用者に、トラック・ビルド・段階的公開の割合・リリースノート（全文）・`pending.changes`（一緒に送る変更）を見せる
-3. 利用者がよいと言ったら、`submit_for_review` を呼ぶ。`track` は省けない。`userFraction` を渡すと段階的公開になる
-4. 出したあとは、`get_release_status` の `review` で状態を見る。審査の結果が出るまで、数時間から7日以上かかることがある
+1. Run the unsent changes through Google checks with `validate_changes`. If `valid` is `false`, fix the `problem`.
+2. Show the user the track, the build, the staged rollout percentage, the release notes (full text), and `pending.changes` (the changes sent together).
+3. When the user agrees, call `submit_for_review`. `track` is required. Pass `userFraction` for a staged rollout.
+4. After that, check the state in `review` from `get_release_status`. The review can take from a few hours to more than seven days.
 
-内部テスト（`internal`）のトラックには審査が無く、すぐ配信される。
+The internal testing track (`internal`) has no review and is available right away.
 
-## 4. 公開する
+## 4. Release
 
-- 管理対象の公開を切っていれば、審査が通ると自動で公開される
-- 管理対象の公開を入れていると、審査が通っても公開されない（`review` の状態が `APPROVED_NOT_PUBLISHED`）。API に公開の操作が無いので、Play Console の [公開の概要] の [変更を公開] を押してもらう
-- 段階的公開は、自動では進まない。`set_phased_release` で、割合を変える（`update`）・止める（`pause`）・再開する（`resume`）・全員に出す（`complete`）。全員に出すのは取り消せない。止めている段階的公開の割合は、`resume` に `userFraction` を渡して変える
-- 全員に出したリリースに問題が見つかったら、`set_phased_release` の `pause` で止められる。新しく入れる人と更新する人には、その前の全員向けのリリースが配られ、もう入れた人はそのまま。前のリリースが無いと Google が断る
+- If managed publishing is off, the release is published automatically after approval.
+- If managed publishing is on, the release is not published after approval (the `review` state is `APPROVED_NOT_PUBLISHED`). The API has no operation to publish, so ask the user to click **Publish changes** on the **Publishing overview** page in Play Console.
+- A staged rollout does not advance automatically. Use `set_phased_release` to change the percentage (`update`), pause (`pause`), resume (`resume`), or release to all users (`complete`). Releasing to all users cannot be undone. To change the percentage of a paused rollout, pass `userFraction` to `resume`.
+- If you find a problem in a release to all users, you can halt it with `pause` in `set_phased_release`. New installs and updates get the previous release to all users, and users who already installed it keep it. Google rejects this if there is no previous release.
 
-## 却下されたとき・審査を止めたいとき
+## When the app is rejected or you want to stop a review
 
-- 却下の理由は、Play Console の画面で読んでもらう。API では読めない
-- 却下のあとは、自動で審査に送れないことがある。外に出るツールが案内を返したら、`notSentForReview: true` を渡して呼び直し、Play Console の [公開の概要] の [審査に送信] で送ってもらう
-- 審査中の変更があると、外に出るツールは送らずに止まる。審査を待つか、利用者が取り下げてよいと言ったら `cancelChangesInReview: true` で送り直す
-- 審査を取り下げるだけの操作は API に無いので、Play Console の [公開の概要] で、変更を [審査にまだ送信されていない変更] に戻してもらう
+- Ask the user to read the rejection reason in Play Console. The API cannot read it.
+- After a rejection, the changes sometimes cannot be sent for review automatically. If a tool that sends returns that guidance, call it again with `notSentForReview: true`, and ask the user to send it with **Send for review** on the **Publishing overview** page in Play Console.
+- If some changes are in review, the tools that send stop without sending. Wait for the review, or if the user agrees to withdraw them, send again with `cancelChangesInReview: true`.
+- The API has no operation that only withdraws a review. Ask the user to move the changes back to **Changes not yet sent for review** on the **Publishing overview** page in Play Console.

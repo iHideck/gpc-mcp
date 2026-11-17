@@ -18,10 +18,10 @@ export function trackProgress(): Progress {
           throw error;
         }
         const retry = isRequestProblem(error)
-          ? 'エラーの所を直してから、同じ呼び出しをやり直すと、残りだけを行います'
-          : '同じ呼び出しをやり直すと、残りだけを行います';
+          ? 'Fix the error, then retry the same call to do only the rest'
+          : 'Retry the same call to do only the rest';
         throw new Error(
-          `${finished.join('。')}。${doing}ところで止まりました。${retry}。\n${error instanceof Error ? error.message : String(error)}`,
+          `${finished.join('. ')}. Stopped while ${doing}. ${retry}.\n${error instanceof Error ? error.message : String(error)}`,
           { cause: error },
         );
       }

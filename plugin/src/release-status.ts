@@ -74,7 +74,7 @@ export async function readReview(
     if (error instanceof GpcApiError) {
       return {
         review: null,
-        warning: `${track} の審査の状態を読めませんでした（${error.status}）。`,
+        warning: `Cannot read the review state of ${track} (${error.status}).`,
       };
     }
     throw error;
