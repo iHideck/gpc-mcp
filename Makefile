@@ -32,6 +32,12 @@ run-claude: # 手元のソースの MCP サーバーをつないで、Claude Cod
 	@test -n "$$GPC_SERVICE_ACCOUNT_KEY" || { echo 'GPC_SERVICE_ACCOUNT_KEY に、サービスアカウントの鍵のファイルのパスを入れてください' >&2; exit 1; }
 	claude --strict-mcp-config --mcp-config dev/mcp.json
 
+.PHONY: pack-npm
+pack-npm: # npm のパッケージを .local/ に作り、npx でそこからサーバーが起動するかを確かめる
+	mkdir -p .local
+	cd plugin && npm pack --pack-destination ../.local
+	node dev/check-npx.ts .local/ihideck-gpc-mcp-$$(node -p "require('./plugin/package.json').version").tgz
+
 .PHONY: validate-plugin
 # --strict は、plugin.json に version が無いことを警告して落とす。version を書くと、上げるまで利用者に更新が届かないので書かない
 validate-plugin: # プラグインとマーケットプレイスの設定を検査する

@@ -1,3 +1,6 @@
 node_modules/
 coverage/
 .local/
+plugin/dist/
+plugin/README.md
+plugin/LICENSE

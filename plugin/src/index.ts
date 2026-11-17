@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
