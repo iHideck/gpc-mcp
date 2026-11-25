@@ -42,13 +42,11 @@ The API cannot do everything, so combine it with Play Console.
 1. Create the app in Play Console and upload the first App Bundle there. The API cannot handle an app that has no builds.
 2. Set the store listing text and images as in step 2. You can add a store listing language by passing all of its required text.
 3. Save it as a draft with `save_draft`. The API cannot send an app that has never been published for review.
-4. Ask the user to fill in the following in Play Console:
-   - The App content declarations (privacy policy, ads, app access, content rating, target audience, and so on).
-   - Data safety can be set with `set_data_safety` if you have a CSV in the format that Play Console exports. The declaration is a legal commitment, so have the user check the CSV before you call it.
-   - The category, price, and countries.
-5. Ask the user to send it with **Send for review** on the **Publishing overview** page in Play Console.
+4. Enter the settings that only Play Console supports with the steps in [website.md](website.md): the App content declarations, the category and tags, the countries, and, if the app uses it, the Play Integrity API.
+   - Set Data safety with `set_data_safety` if you have a CSV in the format that Play Console exports. The declaration is a legal commitment, so have the user check the CSV before you call it.
+5. Send it for review on the **Publishing overview** page with the steps in [website.md](website.md#send-changes-for-review-and-publish-them).
 
-Personal developer accounts created on or after November 13, 2023 need a closed test with at least 12 testers who stay opted in for 14 days in a row before they can release to production. Release the closed test to `alpha` or a track created in Play Console, with the same steps.
+Personal developer accounts created on or after November 13, 2023 need a closed test with at least 12 testers who stay opted in for 14 days in a row before they can release to production. Release the closed test to `alpha` or a track created in Play Console, with the same steps. After the 14 days, apply for access to production with the steps in [website.md](website.md#apply-for-access-to-production).
 
 ## 3. Submit for review
 
@@ -62,13 +60,13 @@ The internal testing track (`internal`) has no review and is available right awa
 ## 4. Release
 
 - If managed publishing is off, the release is published automatically after approval.
-- If managed publishing is on, the release is not published after approval (the `review` state is `APPROVED_NOT_PUBLISHED`). The API has no operation to publish, so ask the user to click **Publish changes** on the **Publishing overview** page in Play Console.
+- If managed publishing is on, the release is not published after approval (the `review` state is `APPROVED_NOT_PUBLISHED`). The API has no operation to publish, so publish it on the **Publishing overview** page with the steps in [website.md](website.md#send-changes-for-review-and-publish-them).
 - A staged rollout does not advance automatically. Use `set_phased_release` to change the percentage (`update`), pause (`pause`), resume (`resume`), or release to all users (`complete`). Releasing to all users cannot be undone. To change the percentage of a paused rollout, pass `userFraction` to `resume`.
 - If you find a problem in a release to all users, you can halt it with `pause` in `set_phased_release`. New installs and updates get the previous release to all users, and users who already installed it keep it. Google rejects this if there is no previous release.
 
 ## When the app is rejected or you want to stop a review
 
 - Ask the user to read the rejection reason in Play Console. The API cannot read it.
-- After a rejection, the changes sometimes cannot be sent for review automatically. If a tool that sends returns that guidance, call it again with `notSentForReview: true`, and ask the user to send it with **Send for review** on the **Publishing overview** page in Play Console.
+- After a rejection, the changes sometimes cannot be sent for review automatically. If a tool that sends returns that guidance, call it again with `notSentForReview: true`, and send it on the **Publishing overview** page with the steps in [website.md](website.md#send-changes-for-review-and-publish-them).
 - If some changes are in review, the tools that send stop without sending. Wait for the review, or if the user agrees to withdraw them, send again with `cancelChangesInReview: true`.
 - The API has no operation that only withdraws a review. Ask the user to move the changes back to **Changes not yet sent for review** on the **Publishing overview** page in Play Console.
