@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- The `release` skill enters the settings that only Play Console supports (App content, category and tags, countries, Play Integrity API, sending for review and publishing, and applying for access to production) with Claude in Chrome. Without Claude in Chrome, it asks the user as before.
+
 ### Changed
 
 - `save_draft` and `submit_for_review` no longer ask for confirmation in Claude Code, because you can withdraw the changes in Play Console until the release is published. `set_phased_release` and `set_data_safety` still ask.
