@@ -147,12 +147,10 @@ describe('MCP サーバー', () => {
       }),
       expect.objectContaining({
         name: 'save_draft',
-        _meta: { 'anthropic/requiresUserInteraction': true },
         inputSchema: expect.objectContaining({ required: ['packageName'] }),
       }),
       expect.objectContaining({
         name: 'submit_for_review',
-        _meta: { 'anthropic/requiresUserInteraction': true },
         inputSchema: expect.objectContaining({ required: ['packageName', 'track'] }),
       }),
       expect.objectContaining({
@@ -167,7 +165,7 @@ describe('MCP サーバー', () => {
       }),
     ]);
 
-    const preparing = [
+    const withoutConfirmation = [
       'create_track',
       'set_testers',
       'upload_bundle',
@@ -176,13 +174,15 @@ describe('MCP サーバー', () => {
       'replace_screenshots',
       'set_app_info',
       'validate_changes',
+      'save_draft',
+      'submit_for_review',
       'discard_changes',
     ];
     expect(
       (listed.result?.tools as { name: string; _meta?: unknown }[])
-        .filter(({ name }) => preparing.includes(name))
+        .filter(({ name }) => withoutConfirmation.includes(name))
         .map(({ _meta }) => _meta),
-    ).toEqual(preparing.map(() => undefined));
+    ).toEqual(withoutConfirmation.map(() => undefined));
 
     const called = await server.request('tools/call', { name: 'list_apps', arguments: {} });
     expect(called.result).toMatchObject({

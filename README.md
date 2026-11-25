@@ -22,8 +22,8 @@ An unofficial MCP server for the Google Play Developer API. Install it as a Clau
 | `set_app_info` | Sets the contact email, phone, and website, and the default language. Can copy the contact details from another app. |
 | `set_data_safety` | Writes the Data safety declaration from a CSV file in the format that Play Console exports. Each call requires your confirmation. |
 | `validate_changes` | Runs the unsent changes through Google's checks. Sends nothing to Google Play. |
-| `save_draft` | Saves the unsent changes to Google Play and keeps the release as a draft. Each call requires your confirmation. |
-| `submit_for_review` | Sends the draft release of a track and the unsent changes to Google Play. A staged rollout on the production track can target specific countries. Each call requires your confirmation. |
+| `save_draft` | Saves the unsent changes to Google Play and keeps the release as a draft. |
+| `submit_for_review` | Sends the draft release of a track and the unsent changes to Google Play. A staged rollout on the production track can target specific countries. Until the release is published, you can withdraw it in Play Console. |
 | `set_phased_release` | Pauses, resumes, changes the percentage of, or completes a staged rollout. Pausing with no staged rollout halts the full release. New users and users who update get the previous full release, and users who already installed it are not affected. You cannot undo a release to all users. Each call requires your confirmation. |
 | `discard_changes` | Discards all changes that you have not sent to Google Play. |
 
@@ -93,7 +93,7 @@ Then set `"command": "node"` and `"args": ["/absolute/path/to/gpc-mcp/plugin/src
 Outside Claude Code, note the following:
 
 - Set `GPC_SERVICE_ACCOUNT_KEY` to an absolute path, or a path that starts with `~/`.
-- Claude Code asks for confirmation before each call to a tool that sends changes to Google Play. Other clients may not. Set the client to ask for approval of `save_draft`, `submit_for_review`, `set_phased_release`, and `set_data_safety`.
+- Claude Code asks for confirmation before each call to a tool that you cannot undo. Other clients may not. Set the client to ask for approval of `set_phased_release` and `set_data_safety`.
 - Unsent changes are kept only while the server runs.
 - The release skill is not loaded. To use it, give the client the instructions in [`plugin/skills/release/SKILL.md`](plugin/skills/release/SKILL.md).
 
