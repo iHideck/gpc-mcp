@@ -85,7 +85,8 @@ const cancelChangesInReviewArgument = z
 
 const userFractionArgument = z.number().gt(0).lt(1);
 
-// 外に出る操作は、Claude Code が呼ぶたびに、利用者の確認を求める（どの権限のモードでも、許可の決まりでも省けない）
+// 取り消せない操作は、Claude Code が呼ぶたびに、利用者の確認を求める（どの権限のモードでも、許可の決まりでも省けない）。
+// 下書きの保存と審査への提出は公開の前に取り消せるので付けない。付けると、利用者が画面の前にいない間、裏のセッションが止まる
 const NEEDS_APPROVAL = { 'anthropic/requiresUserInteraction': true };
 
 const server = new McpServer({ name: 'gpc-mcp', version: packageJson.version });
@@ -389,7 +390,7 @@ server.registerTool(
   {
     title: 'Save draft',
     description:
-      'Saves the unsent changes (pending) to Google Play and keeps releases as drafts. The API cannot send an app that has never been published for review, so save with this tool, then send it for review in Play Console. For a published app, saved store listing and image changes are sent to Google for review. Sends nothing while changes are in review. Each call requires user confirmation. Returns the saved changes.',
+      'Saves the unsent changes (pending) to Google Play and keeps releases as drafts. The API cannot send an app that has never been published for review, so save with this tool, then send it for review in Play Console. For a published app, saved store listing and image changes are sent to Google for review. Sends nothing while changes are in review. Returns the saved changes.',
     inputSchema: z.object({
       ...appArguments,
       cancelChangesInReview: cancelChangesInReviewArgument,
@@ -401,7 +402,6 @@ server.registerTool(
       idempotentHint: true,
       openWorldHint: true,
     },
-    _meta: NEEDS_APPROVAL,
   },
   async (request) => json(await saveDraft(await getPlay(), request)),
 );
@@ -411,7 +411,7 @@ server.registerTool(
   {
     title: 'Submit for review',
     description:
-      'Sends the draft release on the track and the unsent changes (store listings, images, and so on) to Google Play. On tracks with review, submits them for review. The internal track has no review and is available right away. After approval, the release is published automatically unless managed publishing is on. With userFraction, starts a staged rollout; without it, releases to all users. If there is no draft release, sends other unsent changes such as store listings. Sends nothing while changes are in review. Each call requires user confirmation. Returns the release before and after, the sent changes, the review state, and warnings.',
+      'Sends the draft release on the track and the unsent changes (store listings, images, and so on) to Google Play. On tracks with review, submits them for review. The internal track has no review and is available right away. After approval, the release is published automatically unless managed publishing is on. With userFraction, starts a staged rollout; without it, releases to all users. If there is no draft release, sends other unsent changes such as store listings. Sends nothing while changes are in review. Until the release is published, you can withdraw it in Play Console. Returns the release before and after, the sent changes, the review state, and warnings.',
     inputSchema: z.object({
       ...appArguments,
       track: requiredTrackArgument,
@@ -440,7 +440,6 @@ server.registerTool(
       idempotentHint: true,
       openWorldHint: true,
     },
-    _meta: NEEDS_APPROVAL,
   },
   async (request) => json(await submitForReview(await getPlay(), request)),
 );

@@ -13,7 +13,9 @@ The preparation tools only write to the *unsent changes* (`pending`). Google Pla
 - Google documents that a service account can have only one open edit. Reading or writing another app can make the unsent changes lost. Finish sending one app before you move to the next.
 - If you no longer need the unsent changes, discard them with `discard_changes`.
 
-Claude Code asks the user for confirmation every time a tool that sends to Google Play (`submit_for_review`, `save_draft`, `set_phased_release`, `set_data_safety`) is called. Before you call one, explain in text what it will do, and call it only after the user agrees.
+Claude Code asks the user for confirmation every time a tool that you cannot undo (`set_phased_release` and `set_data_safety`) is called. Before you call one, explain in text what it will do, and call it only after the user agrees.
+
+`save_draft` and `submit_for_review` do not ask for confirmation, because the user can withdraw the changes in Play Console until the release is published. Call them without waiting when the user has asked to save or to submit, so that the work continues while the user is away.
 
 ## 1. Check the current state
 
@@ -51,8 +53,8 @@ Personal developer accounts created on or after November 13, 2023 need a closed 
 ## 3. Submit for review
 
 1. Run the unsent changes through Google checks with `validate_changes`. If `valid` is `false`, fix the `problem`.
-2. Show the user the track, the build, the staged rollout percentage, the release notes (full text), and `pending.changes` (the changes sent together).
-3. When the user agrees, call `submit_for_review`. `track` is required. Pass `userFraction` for a staged rollout.
+2. Call `submit_for_review` if the user has asked to submit (for example, "Release the next Android version" or "Submit it for review"). Otherwise, ask the user first. `track` is required. Pass `userFraction` for a staged rollout.
+3. Report the track, the build, the staged rollout percentage, the release notes (full text), and the sent changes. Until the release is published, the user can withdraw it by moving the changes back to **Changes not yet sent for review** on the **Publishing overview** page in Play Console.
 4. After that, check the state in `review` from `get_release_status`. The review can take from a few hours to more than seven days.
 
 The internal testing track (`internal`) has no review and is available right away.

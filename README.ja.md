@@ -22,8 +22,8 @@ Google Play Developer API を呼ぶ MCP サーバー（非公式）。Claude Cod
 | `set_app_info` | 連絡先（メール・電話・ウェブサイト）と既定の言語を入れる。連絡先は、ほかのアプリから写せる |
 | `set_data_safety` | データセーフティの申告を、Play Console から書き出せる形の CSV で入れる。呼ぶたびに、利用者の確認が要る |
 | `validate_changes` | まだ送っていない変更を、Google の検査に通す。Google Play には何も送らない |
-| `save_draft` | まだ送っていない変更を Google Play に保存する。リリースは下書きのまま。呼ぶたびに、利用者の確認が要る |
-| `submit_for_review` | トラックの下書きのリリースと、まだ送っていない変更を Google Play に送る。製品版の段階的公開では、配る国を絞れる。呼ぶたびに、利用者の確認が要る |
+| `save_draft` | まだ送っていない変更を Google Play に保存する。リリースは下書きのまま |
+| `submit_for_review` | トラックの下書きのリリースと、まだ送っていない変更を Google Play に送る。製品版の段階的公開では、配る国を絞れる。公開されるまでは、Play Console で取り下げられる |
 | `set_phased_release` | 段階的公開を、止める・再開する・割合を変える・全員に出す。段階的公開が無いときに止めると、全員に出したリリースを止める。新しく入れる人と更新する人には、その前の全員向けのリリースが配られ、もう入れた人はそのまま。全員に出すのは取り消せない。呼ぶたびに、利用者の確認が要る |
 | `discard_changes` | まだ Google Play に送っていない変更を捨てる |
 
@@ -93,7 +93,7 @@ npm ci --prefix plugin
 Claude Code の外では、次のことに気を付ける。
 
 - `GPC_SERVICE_ACCOUNT_KEY` には、絶対パスか `~/` で始まるパスを入れる
-- Claude Code は、Google Play に変更を送るツールを呼ぶたびに確認を出す。ほかのクライアントは出さないことがある。`save_draft`・`submit_for_review`・`set_phased_release`・`set_data_safety` を承認制にするよう、クライアントを設定する
+- Claude Code は、取り消せないツールを呼ぶたびに確認を出す。ほかのクライアントは出さないことがある。`set_phased_release`・`set_data_safety` を承認制にするよう、クライアントを設定する
 - まだ送っていない変更は、サーバーが動いている間だけ残る
 - リリースのスキルは読み込まれない。使うときは、[`plugin/skills/release/SKILL.md`](plugin/skills/release/SKILL.md) の手順をクライアントに渡す
 

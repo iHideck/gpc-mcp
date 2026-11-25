@@ -23,7 +23,7 @@ Do not put your service account key or its contents in an issue. To report a sec
 - Every request that the server sends must exist in Google's Discovery documents for the Google Play Developer API and the Google Play Developer Reporting API. The tests check each request against the documents that Google currently publishes.
 - Tests must not call the real Google Play API. Use the fakes in `test/fake-api.ts` and `test/fake-play.ts`.
 - Text that users see (tool descriptions, parameter descriptions, errors, progress messages, and the skill) is in English.
-- Tools that prepare a release write only to the unsent changes (the open edit). Only tools that require user confirmation may commit an edit or otherwise send changes to Google Play. Set `_meta["anthropic/requiresUserInteraction"]` on them.
+- Tools that prepare a release write only to the unsent changes (the open edit). Only `save_draft`, `submit_for_review`, and tools that require user confirmation may commit an edit or otherwise send changes to Google Play. A tool that does something you cannot undo, such as changing a staged rollout or writing the Data safety declaration, must require user confirmation. Do not require it for a tool that you can undo before the release is published, such as `submit_for_review`, because it stops unattended sessions. Set `_meta["anthropic/requiresUserInteraction"]` on it.
 - Do not return or log the service account key or access tokens, including in error messages.
 
 When you try your change against the real API with `make run-claude`, keep the default `GPC_READ_ONLY=1` unless you mean to write to Google Play.

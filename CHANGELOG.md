@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- `save_draft` and `submit_for_review` no longer ask for confirmation in Claude Code, because you can withdraw the changes in Play Console until the release is published. `set_phased_release` and `set_data_safety` still ask.
+
 ## [1.0.0] - 2026-11-17
 
 The first release.
